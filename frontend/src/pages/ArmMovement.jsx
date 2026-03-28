@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ROUTES } from '../config/appConfig';
 import { usePoseTracking } from '../hooks/usePoseTracking';
 import { useRaiseRightArmMetrics } from '../hooks/useRaiseRightArmMetrics';
+import { useRaiseLeftArmMetrics } from '../hooks/useRaiseLeftArmMetrics';
 import WebcamPanel from '../components/WebcamPanel';
 import MetricCard from '../components/MetricCard';
 import PoseOverlay from '../components/PoseOverlay';
@@ -35,9 +36,10 @@ export default function ArmMovement() {
   const webcamRef  = useRef(null);
   const overlayRef  = useRef(null);
 
-  const exercise   = EXERCISES[exerciseIndex];
-  const isTracking = sessionStatus === STATUS.TRACKING;
+  const exercise    = EXERCISES[exerciseIndex];
+  const isTracking   = sessionStatus === STATUS.TRACKING;
   const isRaiseRight = exercise.id === 'raiseRight';
+  const isRaiseLeft  = exercise.id === 'raiseLeft';
 
   // ── Pose detection (MediaPipe Pose) ─────────────────────────────────────
   const {
@@ -58,20 +60,36 @@ export default function ArmMovement() {
     poseDetected,
   );
 
-  // ── Derived display values ───────────────────────────────────────────────
-  const calibrating = isRaiseRight ? raiseRightCalibrating : false;
+  // ── Raise Left Arm metrics (active only for the raiseLeft exercise) ────
+  const {
+    metrics:    raiseLeftMetrics,
+    calibrating: raiseLeftCalibrating,
+    statusText:  raiseLeftStatusText,
+  } = useRaiseLeftArmMetrics(
+    landmarksRef,
+    isTracking && isRaiseLeft,
+    poseDetected,
+  );
+
+  // ── Derived display values ──────────────────────────────────────────
+  const calibrating = isRaiseRight ? raiseRightCalibrating
+                    : isRaiseLeft  ? raiseLeftCalibrating
+                    : false;
+
+  const activeMetrics = isRaiseRight ? raiseRightMetrics : raiseLeftMetrics;
 
   function getStatusValue() {
     if (!isTracking) {
       return sessionStatus === STATUS.STOPPED ? 'Session stopped' : 'Press start to begin';
     }
-    if (poseLoading)  return 'Loading pose tracker\u2026';
-    if (poseError)    return 'Pose tracker unavailable';
-    if (isRaiseRight) return raiseRightStatusText;
+    if (poseLoading)   return 'Loading pose tracker\u2026';
+    if (poseError)     return 'Pose tracker unavailable';
+    if (isRaiseRight)  return raiseRightStatusText;
+    if (isRaiseLeft)   return raiseLeftStatusText;
     return 'Pose detection coming soon for this exercise';
   }
 
-  const showLiveMetrics = isTracking && isRaiseRight && !calibrating && !poseLoading && !poseError;
+  const showLiveMetrics = isTracking && (isRaiseRight || isRaiseLeft) && !calibrating && !poseLoading && !poseError;
   const statusAccent    = isTracking && !poseLoading && !poseError && poseDetected && !calibrating;
 
   function handleStart() { setSessionStatus(STATUS.TRACKING); }
@@ -93,7 +111,12 @@ export default function ArmMovement() {
         {/* Left column: webcam feed */}
         <section className={styles.webcamColumn} aria-label="Webcam panel">
           <WebcamPanel webcamRef={webcamRef} overlayRef={overlayRef} isTracking={isTracking} />
-          <PoseOverlay overlayRef={overlayRef} landmarksRef={landmarksRef} isTracking={isTracking && isRaiseRight} />
+          <PoseOverlay
+            overlayRef={overlayRef}
+            landmarksRef={landmarksRef}
+            isTracking={isTracking && (isRaiseRight || isRaiseLeft)}
+            side={isRaiseLeft ? 'left' : 'right'}
+          />
           <p className={styles.cameraNote}>
             Position yourself so your full upper body is visible in the camera.
           </p>
@@ -111,19 +134,19 @@ export default function ArmMovement() {
           <div className={styles.metricsGrid} aria-label="Exercise metrics">
             <MetricCard
               label="Height"
-              value={showLiveMetrics ? String(raiseRightMetrics.height) : '--'}
+              value={showLiveMetrics ? String(activeMetrics.height) : '--'}
             />
             <MetricCard
               label="Stability"
-              value={showLiveMetrics ? String(raiseRightMetrics.stability) : '--'}
+              value={showLiveMetrics ? String(activeMetrics.stability) : '--'}
             />
             <MetricCard
               label="Hold Time"
-              value={showLiveMetrics ? `${raiseRightMetrics.holdTime}s` : '--'}
+              value={showLiveMetrics ? `${activeMetrics.holdTime}s` : '--'}
             />
             <MetricCard
               label="Range of Motion"
-              value={showLiveMetrics ? String(raiseRightMetrics.rangeOfMotion) : '--'}
+              value={showLiveMetrics ? String(activeMetrics.rangeOfMotion) : '--'}
             />
             <MetricCard
               label="Status"

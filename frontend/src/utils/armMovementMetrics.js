@@ -29,6 +29,8 @@ export const POSE_LM = {
   RIGHT_ELBOW:    14,
   RIGHT_WRIST:    16,
   LEFT_SHOULDER:  11,
+  LEFT_ELBOW:     13,
+  LEFT_WRIST:     15,
 };
 
 // ─── Thresholds (all 0–100 unless noted) ──────────────────────────────────
@@ -330,4 +332,161 @@ export function drawArmOverlay(ctx, landmarks, w, h) {
   dot(rsX, rsY, 6, armColor, true);                   // right shoulder
   dot(reX, reY, 5, armColor, true);                   // right elbow
   dot(rwX, rwY, 7, armColor, true);                   // right wrist
+}
+
+// ─── Left arm ────────────────────────────────────────────────────────────────
+// Mirrors the right-arm functions above but uses LEFT_SHOULDER / LEFT_ELBOW /
+// LEFT_WRIST landmarks (indices 11, 13, 15).
+
+export function areLandmarksValidLeft(landmarks) {
+  if (!landmarks || landmarks.length < 17) return false;
+  const required = [
+    POSE_LM.LEFT_SHOULDER,
+    POSE_LM.LEFT_ELBOW,
+    POSE_LM.LEFT_WRIST,
+    POSE_LM.RIGHT_SHOULDER,
+  ];
+  return required.every((idx) => {
+    const lm = landmarks[idx];
+    return lm && (lm.visibility ?? 1) >= LANDMARK_VISIBILITY_THRESHOLD;
+  });
+}
+
+export function captureLeftArmBaselineSample(landmarks) {
+  const ls = landmarks[POSE_LM.LEFT_SHOULDER];
+  const lw = landmarks[POSE_LM.LEFT_WRIST];
+  const rs = landmarks[POSE_LM.RIGHT_SHOULDER];
+
+  const shoulderWidth = Math.abs(rs.x - ls.x) || 0.2;
+
+  return {
+    shoulderY:     ls.y,
+    wristY:        lw.y,
+    shoulderWidth,
+  };
+}
+
+export function computeRaiseLeftArmMetrics(landmarks, baseline) {
+  const lw = landmarks[POSE_LM.LEFT_WRIST];
+  const ls = landmarks[POSE_LM.LEFT_SHOULDER];
+  const le = landmarks[POSE_LM.LEFT_ELBOW];
+
+  const sw = baseline.shoulderWidth;
+
+  const wristAboveShoulder    = ls.y - lw.y;
+  const wristAboveBaseline    = baseline.wristY - lw.y;
+  const elbowDropFromShoulder = le.y - ls.y;
+
+  const RAISE_SCALE = 200;
+  const height = Math.round(Math.max(0, Math.min(100,
+    (wristAboveShoulder / sw) * RAISE_SCALE,
+  )));
+
+  const ROM_SCALE = 160;
+  const rangeOfMotion = Math.round(Math.max(0, Math.min(100,
+    (wristAboveBaseline / sw) * ROM_SCALE,
+  )));
+
+  const isAboveTarget =
+    wristAboveShoulder    >= TARGET_RAISE_THRESHOLD * sw &&
+    elbowDropFromShoulder <= ELBOW_DROP_TOLERANCE   * sw;
+
+  return {
+    height,
+    rangeOfMotion,
+    rawWristY: lw.y,
+    rawWristX: lw.x,
+    isAboveTarget,
+  };
+}
+
+export function getRaiseLeftArmStatusText({
+  noPose,
+  calibrating,
+  isAboveTarget,
+  holdMs,
+}) {
+  if (noPose)         return 'No body detected';
+  if (calibrating)    return 'Hold still to calibrate…';
+  if (!isAboveTarget) return 'Raise your left arm higher';
+  if (holdMs >= HOLD_DURATION_MS) return 'Great job — well done!';
+  if (holdMs >= 1500) return 'Hold that position';
+  return 'Good height — keep going';
+}
+
+export function drawLeftArmOverlay(ctx, landmarks, w, h) {
+  const ls = landmarks[POSE_LM.LEFT_SHOULDER];
+  const le = landmarks[POSE_LM.LEFT_ELBOW];
+  const lw = landmarks[POSE_LM.LEFT_WRIST];
+  const rs = landmarks[POSE_LM.RIGHT_SHOULDER];
+
+  const px = (lm) => [(1 - lm.x) * w, lm.y * h];
+
+  const [lsX, lsY] = px(ls);
+  const [leX, leY] = px(le);
+  const [lwX, lwY] = px(lw);
+  const [rsX, rsY] = px(rs);
+
+  const sw                    = Math.abs(rs.x - ls.x) || 0.2;
+  const wristAboveShoulder    = ls.y - lw.y;
+  const elbowDropFromShoulder = le.y - ls.y;
+  const isAboveTarget =
+    wristAboveShoulder    >= TARGET_RAISE_THRESHOLD * sw &&
+    elbowDropFromShoulder <= ELBOW_DROP_TOLERANCE   * sw;
+
+  const armColor = isAboveTarget ? '#2ecc71' : '#3ecfb2';
+
+  // ── Shoulder-to-shoulder reference bar
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(lsX, lsY);
+  ctx.lineTo(rsX, rsY);
+  ctx.strokeStyle = 'rgba(255,255,255,0.20)';
+  ctx.lineWidth   = 1.5;
+  ctx.stroke();
+  ctx.restore();
+
+  // ── Dashed horizontal line at shoulder height
+  const midShoulderY = (lsY + rsY) / 2;
+  ctx.save();
+  ctx.setLineDash([8, 6]);
+  ctx.beginPath();
+  ctx.moveTo(0, midShoulderY);
+  ctx.lineTo(w, midShoulderY);
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth   = 1;
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // ── Left arm skeleton
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(lsX, lsY);
+  ctx.lineTo(leX, leY);
+  ctx.lineTo(lwX, lwY);
+  ctx.strokeStyle = armColor + 'cc';
+  ctx.lineWidth   = 3.5;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+  ctx.shadowColor = armColor;
+  ctx.shadowBlur  = 10;
+  ctx.stroke();
+  ctx.restore();
+
+  // ── Joint dots
+  const dot = (x, y, radius, color, glow = true) => {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    if (glow) { ctx.shadowBlur = 12; ctx.shadowColor = color; }
+    ctx.fill();
+    ctx.restore();
+  };
+
+  dot(rsX, rsY, 5, 'rgba(255,255,255,0.45)', false); // right shoulder (reference)
+  dot(lsX, lsY, 6, armColor, true);                   // left  shoulder
+  dot(leX, leY, 5, armColor, true);                   // left  elbow
+  dot(lwX, lwY, 7, armColor, true);                   // left  wrist
 }
