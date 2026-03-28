@@ -11,11 +11,13 @@ const enabledExercises = getEnabledExercises();
 const STATUS = {
   IDLE:     'idle',
   TRACKING: 'tracking',
+  STOPPED:  'stopped',
 };
 
 const STATUS_LABEL = {
   [STATUS.IDLE]:     'Press start to begin',
   [STATUS.TRACKING]: 'Tracking\u2026',
+  [STATUS.STOPPED]:  'Stopped',
 };
 
 /**
@@ -50,6 +52,10 @@ export default function FacialExercisePage() {
     setSessionStatus(STATUS.TRACKING);
   }
 
+  function handleStop() {
+    setSessionStatus(STATUS.STOPPED);
+  }
+
   function handleNextExercise() {
     const currentIndex = enabledExercises.findIndex((e) => e.id === currentExerciseId);
     const nextIndex = (currentIndex + 1) % enabledExercises.length;
@@ -76,7 +82,7 @@ export default function FacialExercisePage() {
       <div className={styles.layout}>
         {/* Left column: webcam feed */}
         <section className={styles.webcamColumn} aria-label="Webcam panel">
-          <WebcamPanel />
+          <WebcamPanel isTracking={isTracking} />
         </section>
 
         {/* Right column: exercise info, metrics, controls */}
@@ -104,16 +110,16 @@ export default function FacialExercisePage() {
           <div className={styles.controls}>
             <button
               type="button"
-              className={styles.primaryButton}
-              onClick={handleStart}
-              disabled={isTracking}
+              className={isTracking ? styles.stopButton : styles.primaryButton}
+              onClick={isTracking ? handleStop : handleStart}
             >
-              Start
+              {isTracking ? 'Stop' : 'Start'}
             </button>
             <button
               type="button"
               className={styles.secondaryButton}
               onClick={handleNextExercise}
+              disabled={isTracking}
             >
               Next Exercise
             </button>

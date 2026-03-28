@@ -12,11 +12,13 @@ import styles from './CommonPhrases.module.css';
 const STATUS = {
   IDLE:      'idle',
   LISTENING: 'listening',
+  STOPPED:   'stopped',
 };
 
 const STATUS_LABEL = {
   [STATUS.IDLE]:      'Press start to begin',
   [STATUS.LISTENING]: 'Listening\u2026',
+  [STATUS.STOPPED]:   'Stopped',
 };
 
 const phrases = getPhrasesForCategory('commonPhrases');
@@ -50,6 +52,10 @@ export default function CommonPhrases({ onBack }) {
     setStatus(STATUS.LISTENING);
   }
 
+  function handleStop() {
+    setStatus(STATUS.STOPPED);
+  }
+
   function handleNextPhrase() {
     setPhraseIndex((i) => (i + 1) % phrases.length);
     setStatus(STATUS.IDLE);
@@ -72,7 +78,7 @@ export default function CommonPhrases({ onBack }) {
       <div className={styles.layout}>
         {/* Left column: webcam feed */}
         <section className={styles.webcamColumn} aria-label="Webcam panel">
-          <WebcamPanel />
+          <WebcamPanel isTracking={isListening} />
         </section>
 
         {/* Right column: phrase card, metrics, controls */}
@@ -104,16 +110,16 @@ export default function CommonPhrases({ onBack }) {
           <div className={styles.controls}>
             <button
               type="button"
-              className={styles.primaryButton}
-              onClick={handleStart}
-              disabled={isListening}
+              className={isListening ? styles.stopButton : styles.primaryButton}
+              onClick={isListening ? handleStop : handleStart}
             >
-              Start
+              {isListening ? 'Stop' : 'Start'}
             </button>
             <button
               type="button"
               className={styles.secondaryButton}
               onClick={handleNextPhrase}
+              disabled={isListening}
             >
               Next Phrase
             </button>
