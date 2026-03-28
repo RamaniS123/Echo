@@ -1,0 +1,113 @@
+﻿/* ============================================================
+   Echo — global base styles
+   All design tokens are defined here as CSS custom properties.
+   Components import values via var() — no token values are
+   repeated in component CSS modules.
+   ============================================================ */
+
+:root {
+  /* Typography */
+  --font-sans: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Colour scheme */
+  color-scheme: dark;
+
+  /* Background */
+  --bg:            #0f1117;
+  --surface:       #1a1d27;
+  --surface-hover: #22263a;
+  --surface-muted: #16192280;
+
+  /* Text */
+  --text-primary:   #f0f2f8;
+  --text-secondary: #9ca3b0;
+  --text-muted:     #5c6270;
+
+  /* Borders */
+  --border:        #2a2d3e;
+  --border-strong: #3a3e54;
+
+  /* Accent — Echo teal */
+  --accent:    #3ecfb2;
+  --on-accent: #0a1a17;
+
+  /* Border radii */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.55);
+
+  /* Accent tints — used for active-state cards and glows */
+  --accent-dim:        rgba(62, 207, 178, 0.08);
+  --accent-dim-border: rgba(62, 207, 178, 0.22);
+  --accent-glow:       0 0 0 4px rgba(62, 207, 178, 0.16);
+
+  /* Elevated surface — for cards sitting on top of --surface */
+  --surface-elevated: #1e2132;
+
+  /* Page background */
+  background-color: var(--bg);
+  color: var(--text-primary);
+}
+
+/* ── Reset ────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--bg);
+  color: var(--text-primary);
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+.app {
+  min-height: 100dvh;
+}
+
+/* ── Global focus ring ───────────────────────────────────── */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Typography baseline ─────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+p {
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+a {
+  color: var(--accent);
+}
+
+/* ── Button reset ────────────────────────────────────────── */
+button {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  cursor: pointer;
+}
