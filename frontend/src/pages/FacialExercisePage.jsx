@@ -1,8 +1,10 @@
-﻿import { useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../config/appConfig';
 import { getEnabledExercises, getExerciseById } from '../config/exercises';
 import { useFaceTracking } from '../hooks/useFaceTracking';
+import { useSmileMetrics } from '../hooks/useSmileMetrics';
+import { drawLandmarkOverlay } from '../utils/smileMetrics';
 import WebcamPanel from '../components/WebcamPanel';
 import MetricCard from '../components/MetricCard';
 import styles from './FacialExercisePage.module.css';
@@ -24,13 +26,13 @@ const STATUS_LABEL = {
 /**
  * FacialExercisePage
  *
- * Renders the facial exercise practice interface.
+ * Renders the facial exercise practice interface with live smile tracking.
  *
- * Exercise state is driven by `currentExerciseId`. The active exercise object
- * is always derived via `getExerciseById` — the page never indexes the array directly.
- *
- * All metric values are placeholders (0 / "--").
- * MediaPipe integration will update these via a custom hook.
+ * Data flow:
+ *   WebcamPanel (react-webcam) → webcamRef.current.video
+ *     → useFaceTracking  (MediaPipe, 60 fps)  → landmarksRef, faceDetected
+ *     → useSmileMetrics  (own RAF, ~30 fps UI) → left, right, strength, symmetry, statusText
+ *     → overlay RAF loop (canvas drawing)
  */
 export default function FacialExercisePage() {
   const [currentExerciseId, setCurrentExerciseId] = useState(
@@ -38,36 +40,78 @@ export default function FacialExercisePage() {
   );
   const [sessionStatus, setSessionStatus] = useState(STATUS.IDLE);
 
-  // Ref forwarded to WebcamPanel → react-webcam; video element at webcamRef.current?.video
-  const webcamRef = useRef(null);
+  // Ref forwarded to WebcamPanel → react-webcam; video at webcamRef.current?.video
+  const webcamRef  = useRef(null);
+  // Ref for the canvas overlay drawn inside WebcamPanel
+  const overlayRef = useRef(null);
 
   const activeExercise = getExerciseById(currentExerciseId);
-  const isTracking = sessionStatus === STATUS.TRACKING;
+  const isTracking     = sessionStatus === STATUS.TRACKING;
 
+  // ── Face detection (MediaPipe) ──────────────────────────────────────────
   const {
     faceDetected,
+    landmarksRef,
     isLoading: trackerLoading,
     error:     trackerError,
   } = useFaceTracking(webcamRef, isTracking);
 
-  // Derive the Status card value based on session + face-tracking state
-  function getStatusValue() {
-    if (!isTracking) return STATUS_LABEL[sessionStatus];
-    if (trackerLoading) return 'Loading face tracker…';
+  // ── Smile metrics (calibration + EMA smoothing) ─────────────────────────
+  const { metrics, calibrating, statusText } = useSmileMetrics(
+    landmarksRef,
+    isTracking,
+    faceDetected,
+  );
+
+  // ── Overlay drawing RAF ─────────────────────────────────────────────────
+  useEffect(() => {
+    const canvas = overlayRef.current;
+    if (!isTracking) {
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      return;
+    }
+
+    let rafId;
+
+    function drawFrame() {
+      const cvs = overlayRef.current;
+      if (!cvs) { rafId = requestAnimationFrame(drawFrame); return; }
+
+      // Keep canvas resolution in sync with its CSS size
+      const w = cvs.offsetWidth;
+      const h = cvs.offsetHeight;
+      if (cvs.width !== w || cvs.height !== h) {
+        cvs.width  = w;
+        cvs.height = h;
+      }
+
+      const ctx = cvs.getContext('2d');
+      ctx.clearRect(0, 0, w, h);
+
+      const landmarks = landmarksRef.current;
+      if (landmarks) drawLandmarkOverlay(ctx, landmarks, w, h);
+
+      rafId = requestAnimationFrame(drawFrame);
+    }
+
+    rafId = requestAnimationFrame(drawFrame);
+    return () => cancelAnimationFrame(rafId);
+  }, [isTracking, landmarksRef]);
+
+  // ── Derived display values ───────────────────────────────────────────────
+  function getFaceStatusValue() {
+    if (!isTracking)    return STATUS_LABEL[sessionStatus];
+    if (trackerLoading) return 'Loading face tracker\u2026';
     if (trackerError)   return 'Tracker unavailable';
-    return faceDetected ? 'Face detected' : 'No face detected';
+    return statusText;                          // driven by useSmileMetrics
   }
 
-  // Accent the status card when actively tracking AND a face is found
-  const statusAccent = isTracking && !trackerLoading && !trackerError && faceDetected;
-
-  // Placeholder metrics — Left/Right/Symmetry/Strength driven by metric utils in a future iteration
-  const metrics = [
-    { id: 'left',             label: 'Left',              value: '0' },
-    { id: 'right',            label: 'Right',             value: '0' },
-    { id: 'symmetryScore',    label: 'Symmetry Score',    value: '--' },
-    { id: 'movementStrength', label: 'Movement Strength', value: '--' },
-  ];
+  // Accent the wide Status card only when a face is found post-calibration
+  const statusAccent = isTracking && !trackerLoading && !trackerError
+                        && faceDetected && !calibrating;
 
   function handleStart() {
     setSessionStatus(STATUS.TRACKING);
@@ -79,7 +123,7 @@ export default function FacialExercisePage() {
 
   function handleNextExercise() {
     const currentIndex = enabledExercises.findIndex((e) => e.id === currentExerciseId);
-    const nextIndex = (currentIndex + 1) % enabledExercises.length;
+    const nextIndex    = (currentIndex + 1) % enabledExercises.length;
     setCurrentExerciseId(enabledExercises[nextIndex].id);
     setSessionStatus(STATUS.IDLE);
   }
@@ -103,7 +147,7 @@ export default function FacialExercisePage() {
       <div className={styles.layout}>
         {/* Left column: webcam feed */}
         <section className={styles.webcamColumn} aria-label="Webcam panel">
-          <WebcamPanel webcamRef={webcamRef} isTracking={isTracking} />
+          <WebcamPanel webcamRef={webcamRef} overlayRef={overlayRef} isTracking={isTracking} />
         </section>
 
         {/* Right column: exercise info, metrics, controls */}
@@ -116,12 +160,13 @@ export default function FacialExercisePage() {
 
           {/* Metrics grid */}
           <div className={styles.metricsGrid} aria-label="Exercise metrics">
-            {metrics.map((m) => (
-              <MetricCard key={m.id} label={m.label} value={m.value} />
-            ))}
+            <MetricCard label="Left"              value={isTracking && !calibrating ? String(metrics.left)     : '--'} />
+            <MetricCard label="Right"             value={isTracking && !calibrating ? String(metrics.right)    : '--'} />
+            <MetricCard label="Symmetry Score"    value={isTracking && !calibrating ? String(metrics.symmetry) : '--'} />
+            <MetricCard label="Movement Strength" value={isTracking && !calibrating ? String(metrics.strength) : '--'} />
             <MetricCard
               label="Status"
-              value={getStatusValue()}
+              value={getFaceStatusValue()}
               accent={statusAccent}
               wide
             />

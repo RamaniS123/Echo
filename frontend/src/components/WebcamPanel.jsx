@@ -21,7 +21,7 @@ const VIDEO_CONSTRAINTS = {
  * Props:
  *   webcamRef — optional React ref forwarded to the underlying <Webcam> element
  */
-export default function WebcamPanel({ webcamRef, isTracking = false }) {
+export default function WebcamPanel({ webcamRef, isTracking = false, overlayRef = null }) {
   const [camState, setCamState] = useState('loading'); // 'loading' | 'active' | 'error'
   const internalRef = useRef(null);
   const resolvedRef = webcamRef ?? internalRef;
@@ -87,6 +87,15 @@ export default function WebcamPanel({ webcamRef, isTracking = false }) {
           <span className={styles.trackingDot} />
           Tracking
         </div>
+      )}
+
+      {/* Landmark overlay canvas — drawn by the parent page */}
+      {overlayRef && (
+        <canvas
+          ref={overlayRef}
+          className={styles.overlayCanvas}
+          aria-hidden="true"
+        />
       )}
     </div>
   );
