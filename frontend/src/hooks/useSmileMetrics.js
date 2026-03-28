@@ -24,7 +24,7 @@ const SMOOTH = 0.25;
  */
 const DISPLAY_INTERVAL = 1000 / 30;
 
-const ZERO_METRICS = { left: 0, right: 0, strength: 0, symmetry: 100 };
+const ZERO_METRICS = { left: 0, right: 0, strength: 0, symmetry: null };
 
 /**
  * useSmileMetrics
@@ -112,15 +112,37 @@ export function useSmileMetrics(landmarksRef, isTracking, faceDetected) {
       // ── Tracking phase ─────────────────────────────────────────────────
       const raw = computeSmileMovement(landmarks, baselineRef.current);
 
-      // EMA smoothing
+      // When the head is tilted, skip EMA updates entirely so false values
+      // don’t bleed into the smoothed state. Just update the status message.
+      if (raw.headTilted) {
+        if (timestamp - lastDisplayRef.current >= DISPLAY_INTERVAL) {
+          lastDisplayRef.current = timestamp;
+          setStatusText('Keep your head level');
+        }
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      // EMA smoothing for left / right / strength.
+      // symmetry is re-derived from the smoothed values so that null/not-null
+      // reflects the smoothed strength, not raw jitter.
       const s      = smoothedRef.current;
       const smooth = (a, b) => SMOOTH * a + (1 - SMOOTH) * b;
-      const next = {
-        left:     Math.round(smooth(raw.left,     s.left)),
-        right:    Math.round(smooth(raw.right,    s.right)),
-        strength: Math.round(smooth(raw.strength, s.strength)),
-        symmetry: Math.round(smooth(raw.symmetry, s.symmetry)),
-      };
+      const nextLeft     = Math.round(smooth(raw.left,     s.left));
+      const nextRight    = Math.round(smooth(raw.right,    s.right));
+      const nextStrength = Math.round(smooth(raw.strength, s.strength));
+
+      // Symmetry: null below threshold, blended when threshold is cleared.
+      // Seed from raw.symmetry when transitioning from null to avoid a jump.
+      let nextSymmetry;
+      if (raw.symmetry === null) {
+        nextSymmetry = null;
+      } else {
+        const prev = s.symmetry ?? raw.symmetry; // seed on first valid frame
+        nextSymmetry = Math.round(smooth(raw.symmetry, prev));
+      }
+
+      const next = { left: nextLeft, right: nextRight, strength: nextStrength, symmetry: nextSymmetry };
       smoothedRef.current = next;
 
       // Throttle React state updates to ~30 fps

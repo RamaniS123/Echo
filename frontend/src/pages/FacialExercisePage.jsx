@@ -162,7 +162,7 @@ export default function FacialExercisePage() {
           <div className={styles.metricsGrid} aria-label="Exercise metrics">
             <MetricCard label="Left"              value={isTracking && !calibrating ? String(metrics.left)     : '--'} />
             <MetricCard label="Right"             value={isTracking && !calibrating ? String(metrics.right)    : '--'} />
-            <MetricCard label="Symmetry Score"    value={isTracking && !calibrating ? String(metrics.symmetry) : '--'} />
+            <MetricCard label="Symmetry Score"    value={isTracking && !calibrating && metrics.symmetry !== null ? String(metrics.symmetry) : '--'} />
             <MetricCard label="Movement Strength" value={isTracking && !calibrating ? String(metrics.strength) : '--'} />
             <MetricCard
               label="Status"
