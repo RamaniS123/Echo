@@ -1,7 +1,8 @@
-﻿import { useState } from 'react';
+﻿import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../config/appConfig';
 import { getEnabledExercises, getExerciseById } from '../config/exercises';
+import { useFaceTracking } from '../hooks/useFaceTracking';
 import WebcamPanel from '../components/WebcamPanel';
 import MetricCard from '../components/MetricCard';
 import styles from './FacialExercisePage.module.css';
@@ -37,10 +38,30 @@ export default function FacialExercisePage() {
   );
   const [sessionStatus, setSessionStatus] = useState(STATUS.IDLE);
 
+  // Ref forwarded to WebcamPanel → react-webcam; video element at webcamRef.current?.video
+  const webcamRef = useRef(null);
+
   const activeExercise = getExerciseById(currentExerciseId);
   const isTracking = sessionStatus === STATUS.TRACKING;
 
-  // Placeholder metrics — driven by useFaceTracking hook in a future iteration
+  const {
+    faceDetected,
+    isLoading: trackerLoading,
+    error:     trackerError,
+  } = useFaceTracking(webcamRef, isTracking);
+
+  // Derive the Status card value based on session + face-tracking state
+  function getStatusValue() {
+    if (!isTracking) return STATUS_LABEL[sessionStatus];
+    if (trackerLoading) return 'Loading face tracker…';
+    if (trackerError)   return 'Tracker unavailable';
+    return faceDetected ? 'Face detected' : 'No face detected';
+  }
+
+  // Accent the status card when actively tracking AND a face is found
+  const statusAccent = isTracking && !trackerLoading && !trackerError && faceDetected;
+
+  // Placeholder metrics — Left/Right/Symmetry/Strength driven by metric utils in a future iteration
   const metrics = [
     { id: 'left',             label: 'Left',              value: '0' },
     { id: 'right',            label: 'Right',             value: '0' },
@@ -82,7 +103,7 @@ export default function FacialExercisePage() {
       <div className={styles.layout}>
         {/* Left column: webcam feed */}
         <section className={styles.webcamColumn} aria-label="Webcam panel">
-          <WebcamPanel isTracking={isTracking} />
+          <WebcamPanel webcamRef={webcamRef} isTracking={isTracking} />
         </section>
 
         {/* Right column: exercise info, metrics, controls */}
@@ -100,8 +121,8 @@ export default function FacialExercisePage() {
             ))}
             <MetricCard
               label="Status"
-              value={STATUS_LABEL[sessionStatus]}
-              accent={isTracking}
+              value={getStatusValue()}
+              accent={statusAccent}
               wide
             />
           </div>
