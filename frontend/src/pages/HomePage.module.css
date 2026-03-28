@@ -41,11 +41,18 @@
 }
 
 .modes {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.125rem;
   width: 100%;
-  max-width: 480px;
+  max-width: 640px;
+}
+
+@media (max-width: 540px) {
+  .modes {
+    grid-template-columns: 1fr;
+    max-width: 480px;
+  }
 }
 
 .modeButton {

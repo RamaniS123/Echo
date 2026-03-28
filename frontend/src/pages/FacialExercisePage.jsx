@@ -69,7 +69,6 @@ export default function FacialExercisePage() {
     metrics:     eyebrowMetrics,
     calibrating: eyebrowCalibrating,
     statusText:  eyebrowStatusText,
-    debugMetrics,
   } = useEyebrowMetrics(landmarksRef, isTracking && currentExerciseId === 'eyebrowRaise', faceDetected);
 
   const isEyebrow  = currentExerciseId === 'eyebrowRaise';
@@ -188,49 +187,6 @@ export default function FacialExercisePage() {
               wide
             />
           </div>
-
-          {/* Eyebrow debug panel — visible only during eyebrow raise exercise */}
-          {isEyebrow && isTracking && !calibrating && debugMetrics && (
-            <div className={styles.debugPanel} aria-label="Eyebrow debug metrics">
-              <div className={styles.debugTitle}>Debug — Eyebrow Metrics</div>
-              <div className={styles.debugRow}>
-                <span className={styles.debugLabel}>rawLeftRise</span>
-                <span className={styles.debugValue}>{debugMetrics.rawLeftRise}</span>
-              </div>
-              <div className={styles.debugRow}>
-                <span className={styles.debugLabel}>rawRightRise</span>
-                <span className={styles.debugValue}>{debugMetrics.rawRightRise}</span>
-              </div>
-              <div className={styles.debugRow}>
-                <span className={styles.debugLabel}>baselineLeft</span>
-                <span className={styles.debugValue}>{debugMetrics.baselineLeftRise}</span>
-              </div>
-              <div className={styles.debugRow}>
-                <span className={styles.debugLabel}>baselineRight</span>
-                <span className={styles.debugValue}>{debugMetrics.baselineRightRise}</span>
-              </div>
-              <div className={styles.debugRow}>
-                <span className={styles.debugLabel}>deltaLeft</span>
-                <span className={styles.debugValue}>{debugMetrics.deltaLeft}</span>
-              </div>
-              <div className={styles.debugRow}>
-                <span className={styles.debugLabel}>deltaRight</span>
-                <span className={styles.debugValue}>{debugMetrics.deltaRight}</span>
-              </div>
-              <div className={styles.debugRow}>
-                <span className={styles.debugLabel}>normalizedLeft</span>
-                <span className={styles.debugValue}>{debugMetrics.normalizedLeft}</span>
-              </div>
-              <div className={styles.debugRow}>
-                <span className={styles.debugLabel}>normalizedRight</span>
-                <span className={styles.debugValue}>{debugMetrics.normalizedRight}</span>
-              </div>
-              <div className={styles.debugRow}>
-                <span className={styles.debugLabel}>SWAP_SIDES</span>
-                <span className={styles.debugValue}>{String(debugMetrics.swapped)}</span>
-              </div>
-            </div>
-          )}
 
           {/* Controls */}
           <div className={styles.controls}>

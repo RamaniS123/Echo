@@ -1,11 +1,13 @@
 export const APP_NAME = 'Echo';
-export const APP_TAGLINE = 'Guided Stroke Recovery Practice';
+export const APP_TAGLINE = 'Your At-Home Stroke Recovery Coach';
 
 export const ROUTES = {
-  HOME: '/',
+  HOME:          '/',
   FACIAL_EXERCISE: '/facial-exercise',
-  SPEECH_PRACTICE: '/speech-practice',
-  SUMMARY: '/summary',
+  ARM_MOVEMENT:  '/arm-movement',
+  HAND_RECOVERY: '/hand-recovery',
+  FULL_SESSION:  '/full-session',
+  SUMMARY:       '/summary',
 };
 
 /**
@@ -14,17 +16,31 @@ export const ROUTES = {
  */
 export const MODE_CARDS = [
   {
-    id: 'facial-exercise',
-    label: 'Facial Exercise Mode',
-    description: 'Practice smile, eye, and eyebrow movements with live feedback.',
-    route: ROUTES.FACIAL_EXERCISE,
-    enabled: true,
+    id:          'facial-recovery',
+    label:       'Facial Recovery',
+    description: 'Practice smile and eyebrow movements with live symmetry feedback.',
+    route:       ROUTES.FACIAL_EXERCISE,
+    enabled:     true,
   },
   {
-    id: 'speech-practice',
-    label: 'Speech Practice Mode',
-    description: 'Practice common phrases and daily conversation at your own pace.',
-    route: ROUTES.SPEECH_PRACTICE,
-    enabled: true,
+    id:          'arm-movement',
+    label:       'Arm Movement',
+    description: 'Build arm strength and range of motion with guided lifting exercises.',
+    route:       ROUTES.ARM_MOVEMENT,
+    enabled:     true,
+  },
+  {
+    id:          'hand-recovery',
+    label:       'Hand Recovery',
+    description: 'Improve hand and finger control with open, close, and hold exercises.',
+    route:       ROUTES.HAND_RECOVERY,
+    enabled:     true,
+  },
+  {
+    id:          'full-session',
+    label:       'Full Session',
+    description: 'A guided sequence combining facial, arm, and hand exercises in one session.',
+    route:       ROUTES.FULL_SESSION,
+    enabled:     true,
   },
 ];
