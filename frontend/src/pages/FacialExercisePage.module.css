@@ -183,3 +183,37 @@
   font-size: 1rem;
   margin: 0;
 }
+
+/* ─── Eyebrow debug panel ───────────────────────────────────────────────── */
+
+.debugPanel {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.875rem;
+  font-family: monospace;
+  font-size: 0.8125rem;
+}
+
+.debugTitle {
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+  font-family: inherit;
+}
+
+.debugRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.1rem 0;
+}
+
+.debugLabel {
+  color: var(--text-secondary);
+}
+
+.debugValue {
+  color: var(--accent);
+  font-weight: 600;
+}

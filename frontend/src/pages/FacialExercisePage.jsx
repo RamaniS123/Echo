@@ -4,7 +4,9 @@ import { ROUTES } from '../config/appConfig';
 import { getEnabledExercises, getExerciseById } from '../config/exercises';
 import { useFaceTracking } from '../hooks/useFaceTracking';
 import { useSmileMetrics } from '../hooks/useSmileMetrics';
+import { useEyebrowMetrics } from '../hooks/useEyebrowMetrics';
 import { drawLandmarkOverlay } from '../utils/smileMetrics';
+import { drawEyebrowOverlay } from '../utils/eyebrowMetrics';
 import WebcamPanel from '../components/WebcamPanel';
 import MetricCard from '../components/MetricCard';
 import styles from './FacialExercisePage.module.css';
@@ -56,12 +58,24 @@ export default function FacialExercisePage() {
     error:     trackerError,
   } = useFaceTracking(webcamRef, isTracking);
 
-  // ── Smile metrics (calibration + EMA smoothing) ─────────────────────────
-  const { metrics, calibrating, statusText } = useSmileMetrics(
-    landmarksRef,
-    isTracking,
-    faceDetected,
-  );
+  // ── Exercise metrics — each hook runs only when its exercise is active ──
+  const {
+    metrics:    smileMetrics,
+    calibrating: smileCalibrating,
+    statusText:  smileStatusText,
+  } = useSmileMetrics(landmarksRef, isTracking && currentExerciseId === 'smile', faceDetected);
+
+  const {
+    metrics:     eyebrowMetrics,
+    calibrating: eyebrowCalibrating,
+    statusText:  eyebrowStatusText,
+    debugMetrics,
+  } = useEyebrowMetrics(landmarksRef, isTracking && currentExerciseId === 'eyebrowRaise', faceDetected);
+
+  const isEyebrow  = currentExerciseId === 'eyebrowRaise';
+  const metrics    = isEyebrow ? eyebrowMetrics    : smileMetrics;
+  const calibrating = isEyebrow ? eyebrowCalibrating : smileCalibrating;
+  const statusText  = isEyebrow ? eyebrowStatusText  : smileStatusText;
 
   // ── Overlay drawing RAF ─────────────────────────────────────────────────
   useEffect(() => {
@@ -92,7 +106,10 @@ export default function FacialExercisePage() {
       ctx.clearRect(0, 0, w, h);
 
       const landmarks = landmarksRef.current;
-      if (landmarks) drawLandmarkOverlay(ctx, landmarks, w, h);
+      if (landmarks) {
+        if (currentExerciseId === 'eyebrowRaise') drawEyebrowOverlay(ctx, landmarks, w, h);
+        else drawLandmarkOverlay(ctx, landmarks, w, h);
+      }
 
       rafId = requestAnimationFrame(drawFrame);
     }
@@ -106,7 +123,7 @@ export default function FacialExercisePage() {
     if (!isTracking)    return STATUS_LABEL[sessionStatus];
     if (trackerLoading) return 'Loading face tracker\u2026';
     if (trackerError)   return 'Tracker unavailable';
-    return statusText;                          // driven by useSmileMetrics
+    return statusText;                          // driven by active exercise hook
   }
 
   // Accent the wide Status card only when a face is found post-calibration
@@ -171,6 +188,49 @@ export default function FacialExercisePage() {
               wide
             />
           </div>
+
+          {/* Eyebrow debug panel — visible only during eyebrow raise exercise */}
+          {isEyebrow && isTracking && !calibrating && debugMetrics && (
+            <div className={styles.debugPanel} aria-label="Eyebrow debug metrics">
+              <div className={styles.debugTitle}>Debug — Eyebrow Metrics</div>
+              <div className={styles.debugRow}>
+                <span className={styles.debugLabel}>rawLeftRise</span>
+                <span className={styles.debugValue}>{debugMetrics.rawLeftRise}</span>
+              </div>
+              <div className={styles.debugRow}>
+                <span className={styles.debugLabel}>rawRightRise</span>
+                <span className={styles.debugValue}>{debugMetrics.rawRightRise}</span>
+              </div>
+              <div className={styles.debugRow}>
+                <span className={styles.debugLabel}>baselineLeft</span>
+                <span className={styles.debugValue}>{debugMetrics.baselineLeftRise}</span>
+              </div>
+              <div className={styles.debugRow}>
+                <span className={styles.debugLabel}>baselineRight</span>
+                <span className={styles.debugValue}>{debugMetrics.baselineRightRise}</span>
+              </div>
+              <div className={styles.debugRow}>
+                <span className={styles.debugLabel}>deltaLeft</span>
+                <span className={styles.debugValue}>{debugMetrics.deltaLeft}</span>
+              </div>
+              <div className={styles.debugRow}>
+                <span className={styles.debugLabel}>deltaRight</span>
+                <span className={styles.debugValue}>{debugMetrics.deltaRight}</span>
+              </div>
+              <div className={styles.debugRow}>
+                <span className={styles.debugLabel}>normalizedLeft</span>
+                <span className={styles.debugValue}>{debugMetrics.normalizedLeft}</span>
+              </div>
+              <div className={styles.debugRow}>
+                <span className={styles.debugLabel}>normalizedRight</span>
+                <span className={styles.debugValue}>{debugMetrics.normalizedRight}</span>
+              </div>
+              <div className={styles.debugRow}>
+                <span className={styles.debugLabel}>SWAP_SIDES</span>
+                <span className={styles.debugValue}>{String(debugMetrics.swapped)}</span>
+              </div>
+            </div>
+          )}
 
           {/* Controls */}
           <div className={styles.controls}>

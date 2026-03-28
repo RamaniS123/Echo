@@ -41,7 +41,7 @@ export const FACIAL_EXERCISES = [
     region: 'eyes',
     requiredLandmarks: [],
     metricFunctionKey: 'measureEyeClosure',
-    enabled: true,
+    enabled: false,
   },
 ];
 

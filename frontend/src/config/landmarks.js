@@ -23,9 +23,11 @@ export const LANDMARK_GROUPS = {
   // Upper lip midpoint — vertical mouth opening reference
   upperLipMid: [13],
 
-  // Eyebrows
-  leftEyebrow:  [70, 63, 105, 66, 107],
-  rightEyebrow: [300, 293, 334, 296, 336],
+  // Eyebrows — mirror-aware (same convention as mouth corners and eye corners above).
+  // [70s] = person's left  = camera-right = LEFT  in mirror.
+  // [300s] = person's right = camera-left  = RIGHT in mirror.
+  leftEyebrow:  [70, 63, 105, 66, 107],    // LEFT  in mirror
+  rightEyebrow: [300, 293, 334, 296, 336], // RIGHT in mirror
 
   // Eyes (used for eye closure / EAR measurement)
   leftEye:  [33, 160, 158, 133, 153, 144],
