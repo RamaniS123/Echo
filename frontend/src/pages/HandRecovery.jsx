@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../config/appConfig';
+import { useHandTracking } from '../hooks/useHandTracking';
+import { useOpenHandMetrics } from '../hooks/useOpenHandMetrics';
 import WebcamPanel from '../components/WebcamPanel';
 import MetricCard from '../components/MetricCard';
+import HandOverlay from '../components/HandOverlay';
 import styles from './HandRecovery.module.css';
 
 const EXERCISES = [
@@ -29,8 +32,49 @@ export default function HandRecovery() {
   const [exerciseIndex, setExerciseIndex] = useState(0);
   const [sessionStatus, setSessionStatus] = useState(STATUS.IDLE);
 
+  const webcamRef  = useRef(null);
+  const overlayRef = useRef(null);
+
   const exercise   = EXERCISES[exerciseIndex];
   const isTracking = sessionStatus === STATUS.TRACKING;
+  const isOpenHand = exercise.id === 'openHand';
+
+  // ── Hand detection (MediaPipe Hands) ─────────────────────────────────────
+  const {
+    handDetected,
+    landmarksRef,
+    isLoading: handLoading,
+    error:     handError,
+  } = useHandTracking(webcamRef, isTracking);
+
+  // ── Open Hand metrics (active only for the openHand exercise) ────────────
+  const {
+    metrics:    openHandMetrics,
+    calibrating: openHandCalibrating,
+    statusText:  openHandStatusText,
+  } = useOpenHandMetrics(
+    landmarksRef,
+    isTracking && isOpenHand,
+    handDetected,
+  );
+
+  // ── Derived display values ────────────────────────────────────────────────
+  const calibrating     = isOpenHand ? openHandCalibrating : false;
+  const showLiveMetrics = isTracking && isOpenHand && !calibrating && !handLoading && !handError;
+  const statusAccent    = isTracking && !handLoading && !handError && handDetected && !calibrating;
+
+  // isOpen for overlay colour — read directly from latest metrics when available
+  const isOpen = showLiveMetrics && openHandMetrics.openClose >= 80 && openHandMetrics.fingerSpread >= 80;
+
+  function getStatusValue() {
+    if (!isTracking) {
+      return sessionStatus === STATUS.STOPPED ? 'Session stopped' : 'Press start to begin';
+    }
+    if (handLoading)  return 'Loading hand tracker\u2026';
+    if (handError)    return 'Hand tracker unavailable';
+    if (isOpenHand)   return openHandStatusText;
+    return 'Hand detection coming soon for this exercise';
+  }
 
   function handleStart() { setSessionStatus(STATUS.TRACKING); }
   function handleStop()  { setSessionStatus(STATUS.STOPPED); }
@@ -50,8 +94,16 @@ export default function HandRecovery() {
       <div className={styles.layout}>
         {/* Left column: webcam feed */}
         <section className={styles.webcamColumn} aria-label="Webcam panel">
-          <WebcamPanel isTracking={isTracking} />
-          <p className={styles.cameraNote}>Hand tracking coming soon — hold your hand in front of the camera so it is clearly visible.</p>
+          <WebcamPanel webcamRef={webcamRef} overlayRef={overlayRef} isTracking={isTracking} />
+          <HandOverlay
+            overlayRef={overlayRef}
+            landmarksRef={landmarksRef}
+            isTracking={isTracking && isOpenHand}
+            isOpen={isOpen}
+          />
+          <p className={styles.cameraNote}>
+            Hold your hand in front of the camera so it is clearly visible.
+          </p>
         </section>
 
         {/* Right column: exercise info, metrics, controls */}
@@ -64,20 +116,26 @@ export default function HandRecovery() {
 
           {/* Metrics grid */}
           <div className={styles.metricsGrid} aria-label="Exercise metrics">
-            <MetricCard label="Open / Close"      value="--" />
-            <MetricCard label="Finger Spread"     value="--" />
-            <MetricCard label="Hold Time"         value="--" />
-            <MetricCard label="Movement Quality"  value="--" />
+            <MetricCard
+              label="Open / Close"
+              value={showLiveMetrics ? String(openHandMetrics.openClose) : '--'}
+            />
+            <MetricCard
+              label="Finger Spread"
+              value={showLiveMetrics ? String(openHandMetrics.fingerSpread) : '--'}
+            />
+            <MetricCard
+              label="Hold Time"
+              value={showLiveMetrics ? `${openHandMetrics.holdTime}s` : '--'}
+            />
+            <MetricCard
+              label="Steadiness"
+              value={showLiveMetrics ? String(openHandMetrics.movementQuality) : '--'}
+            />
             <MetricCard
               label="Status"
-              value={
-                isTracking
-                  ? 'Tracking active — hand detection coming soon'
-                  : sessionStatus === STATUS.STOPPED
-                  ? 'Session stopped'
-                  : 'Press start to begin'
-              }
-              accent={isTracking}
+              value={getStatusValue()}
+              accent={statusAccent}
               wide
             />
           </div>
