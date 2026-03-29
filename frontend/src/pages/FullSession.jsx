@@ -11,6 +11,7 @@ import WebcamPanel  from '../components/WebcamPanel';
 import PoseOverlay  from '../components/PoseOverlay';
 import HandOverlay  from '../components/HandOverlay';
 import MetricCard   from '../components/MetricCard';
+import { speak }    from '../utils/tts';
 import styles       from './FullSession.module.css';
 
 // ─── Session exercise sequence ─────────────────────────────────────────────
@@ -106,8 +107,42 @@ export default function FullSession() {
   // Ref for the pending advance timer — so cleanup on re-render doesn't cancel it
   const transitionTimerRef  = useRef(null);
 
+  // ── TTS spoken-once flags (reset on restart) ─────────────────────────────
+  const spokenRef = useRef({
+    welcome:   false,
+    smile:     false,
+    arm:       false,
+    hand:      false,
+    complete:  false,
+  });
+
   // Cleanup the advance timer on unmount only
   useEffect(() => () => clearTimeout(transitionTimerRef.current), []);
+
+  // ── TTS: welcome + per-step intro ─────────────────────────────────────────
+  // Welcome fires on start and includes the first exercise instruction so
+  // there is only ever one clip playing at session launch.
+  useEffect(() => {
+    if (!sessionStarted) return;
+    if (!spokenRef.current.welcome) {
+      spokenRef.current.welcome = true;
+      spokenRef.current.smile   = true; // already covered by the welcome message
+      speak("Welcome to Echo. Let's begin your recovery session. First, smile as evenly as you can.");
+    }
+  }, [sessionStarted]);
+
+  // Subsequent step intros fire when the step index advances (never on step 0).
+  useEffect(() => {
+    if (!sessionStarted) return;
+    if (isArmStep && !spokenRef.current.arm) {
+      spokenRef.current.arm = true;
+      speak('Great job. Stand with your arms relaxed at your sides while the app calibrates, then raise your right arm.');
+    }
+    if (isHandStep && !spokenRef.current.hand) {
+      spokenRef.current.hand = true;
+      speak('Nice work. Make a relaxed fist while the app calibrates, then open your hand.');
+    }
+  }, [sessionStarted, isArmStep, isHandStep]);
 
   // ── Auto-transition: watch completion signals and advance automatically ───
   useEffect(() => {
@@ -138,6 +173,10 @@ export default function FullSession() {
     transitionTimerRef.current = setTimeout(() => {
       if (stepIndex >= SESSION_STEPS.length - 1) {
         setSessionDone(true);
+        if (!spokenRef.current.complete) {
+          spokenRef.current.complete = true;
+          speak('Session complete. Great job today.');
+        }
       } else {
         setStepIndex((i) => i + 1);
         smileHoldStartRef.current = null;
@@ -176,6 +215,7 @@ export default function FullSession() {
     setSessionDone(false);
     smileHoldStartRef.current  = null;
     transitionFiredRef.current = false;
+    spokenRef.current = { welcome: false, smile: false, arm: false, hand: false, complete: false };
   }
 
   // ── Session complete screen ───────────────────────────────────────────────
