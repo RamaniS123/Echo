@@ -56,7 +56,7 @@ export const EXTENSION_RANGE = 0.6;
  * above the calibrated baseline for the metric to read 100%.
  * A real wide-open hand typically spreads ~0.10–0.20 above rest.
  */
-export const SPREAD_RANGE = 0.25;
+export const SPREAD_RANGE = 0.15;
 
 /**
  * How long (ms) the hand must stay open before Hold Time starts counting.
@@ -113,14 +113,17 @@ export function captureHandBaselineSample(landmarks) {
   const extensions = tipIdxs.map((i) => dist2D(landmarks[i], wrist) / palmSize);
   const avgExtension = extensions.reduce((t, v) => t + v, 0) / extensions.length;
 
-  // Baseline spread: adjacent distances between index–middle–ring–pinky tips
+  // Baseline spread: blend adjacent gaps + overall fan width (index-to-pinky), both /palmSize
   const fingerTipIdxs = [HAND_LM.INDEX_TIP, HAND_LM.MIDDLE_TIP, HAND_LM.RING_TIP, HAND_LM.PINKY_TIP];
   const fingerTips = fingerTipIdxs.map((i) => landmarks[i]);
-  let totalSpread = 0;
+  let totalAdj = 0;
   for (let i = 0; i < fingerTips.length - 1; i++) {
-    totalSpread += dist2D(fingerTips[i], fingerTips[i + 1]);
+    totalAdj += dist2D(fingerTips[i], fingerTips[i + 1]);
   }
-  const avgSpread = (totalSpread / (fingerTips.length - 1)) / palmSize;
+  const adjSpread = (totalAdj / (fingerTips.length - 1)) / palmSize;
+  // index-to-pinky divided by 3 keeps it on the same per-gap scale as adjSpread
+  const fanWidth  = dist2D(fingerTips[0], fingerTips[3]) / 3 / palmSize;
+  const avgSpread = 0.5 * adjSpread + 0.5 * fanWidth;
 
   return { avgExtension, avgSpread, palmSize };
 }
@@ -172,13 +175,15 @@ export function computeOpenHandMetrics(landmarks, baseline) {
     (avgExtension - baseExt) / EXTENSION_RANGE * 100,
   )));
 
-  // Finger Spread: adjacent distance between index–middle–ring–pinky tips (skip thumb)
+  // Finger Spread: blend adjacent gaps + index-to-pinky fan width (same formula as calibration)
   const fingerTips = tips.slice(1); // [index, middle, ring, pinky]
-  let totalSpread = 0;
+  let totalAdj = 0;
   for (let i = 0; i < fingerTips.length - 1; i++) {
-    totalSpread += dist2D(fingerTips[i], fingerTips[i + 1]);
+    totalAdj += dist2D(fingerTips[i], fingerTips[i + 1]);
   }
-  const avgSpread = (totalSpread / (fingerTips.length - 1)) / palmSize;
+  const adjSpread = (totalAdj / (fingerTips.length - 1)) / palmSize;
+  const fanWidth  = dist2D(fingerTips[0], fingerTips[3]) / 3 / palmSize;
+  const avgSpread = 0.5 * adjSpread + 0.5 * fanWidth;
 
   // Spread relative to calibrated resting position — 0% at baseline, 100% at SPREAD_RANGE above baseline
   const baseSpread  = baseline.avgSpread;
