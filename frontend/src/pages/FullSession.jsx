@@ -53,9 +53,9 @@ const SMILE_STRENGTH_THRESHOLD  = 25;
 /** How long the smile must be held above threshold before the step completes. */
 const SMILE_HOLD_DURATION_MS    = 4000;
 /** Arm hold is enforced inside useRaiseRightArmMetrics — 3000 ms. */
-const ARM_HOLD_DURATION_MS      = 4000; // eslint-disable-line no-unused-vars
+const ARM_HOLD_DURATION_MS      = 5000; // eslint-disable-line no-unused-vars
 /** Hand hold is enforced inside useOpenHandMetrics — 2000 ms. */
-const HAND_HOLD_DURATION_MS     = 4000; // eslint-disable-line no-unused-vars
+const HAND_HOLD_DURATION_MS     = 5000; // eslint-disable-line no-unused-vars
 /** Pause showing "Step complete" before auto-advancing. */
 const TRANSITION_DELAY_MS       = 1500;
 
@@ -148,41 +148,45 @@ export default function FullSession() {
     if (!sessionStarted) return;
     if (isArmStep && !spokenRef.current.armIntro) {
       spokenRef.current.armIntro = true;
-      speak('Now, stand with your arms relaxed at your sides while the app calibrates. Then raise your right arm and hold it steady for three seconds.');
+      speak('Now, stand with your arms relaxed at your sides while the app calibrates. Then raise your right arm and hold it steady for five seconds.');
     }
     if (isHandStep && !spokenRef.current.handIntro) {
       spokenRef.current.handIntro = true;
-      speak('Almost done. Make a relaxed fist while the app calibrates. Then open your hand and hold it open for three seconds.');
+      speak('Almost done. Make a relaxed fist while the app calibrates. Then open your hand and hold it open for five seconds.');
     }
   }, [sessionStarted, isArmStep, isHandStep]);
 
-  // ── TTS: hold-phase cues (once per exercise when target first reached) ──────
+  // ── TTS: hold-phase cues — fire at the instant the target is first reached ──
+  // Triggered on raw metric threshold so ElevenLabs has ~1–2 s of latency budget
+  // before the hold window closes. Each flag ensures one play per step.
   useEffect(() => {
     if (!sessionStarted || smileCalibrating) return;
     const smiling = smileMetrics.strength >= SMILE_STRENGTH_THRESHOLD;
     if (isSmileStep && smiling && !spokenRef.current.smileHold) {
       spokenRef.current.smileHold = true;
-      speak('Good. Hold that smile.');
+      speak('Good, hold that smile.');
     }
   }, [sessionStarted, isSmileStep, smileCalibrating, smileMetrics.strength]);
 
   useEffect(() => {
     if (!sessionStarted || armCalibrating) return;
-    const armAtHeight = armStatus.includes('Hold') || armStatus.includes('Great job');
-    if (isArmStep && armAtHeight && !spokenRef.current.armHold) {
+    // Fire as soon as the arm clears the target — armStatus stops saying 'Raise'
+    const armReachedTarget = armStatus.includes('Good height') || armStatus.includes('Hold') || armStatus.includes('Great job');
+    if (isArmStep && armReachedTarget && !spokenRef.current.armHold) {
       spokenRef.current.armHold = true;
-      speak('Good height. Keep your arm steady.');
+      speak('Good, keep it steady.');
     }
   }, [sessionStarted, isArmStep, armCalibrating, armStatus]);
 
   useEffect(() => {
     if (!sessionStarted || openHandCalibrating) return;
-    const handOpen = openHandStatus.includes('Hold') || openHandStatus.includes('Great job');
-    if (isHandStep && handOpen && !spokenRef.current.handHold) {
+    // Fire as soon as openClose crosses the threshold (same moment the hold timer starts)
+    const handReachedTarget = openHandMetrics.openClose >= 22;
+    if (isHandStep && handReachedTarget && !spokenRef.current.handHold) {
       spokenRef.current.handHold = true;
-      speak('Good. Hold your hand open.');
+      speak('Good, keep your hand open.');
     }
-  }, [sessionStarted, isHandStep, openHandCalibrating, openHandStatus]);
+  }, [sessionStarted, isHandStep, openHandCalibrating, openHandMetrics.openClose]);
 
   // ── Auto-transition: watch completion signals and advance automatically ───
   useEffect(() => {
