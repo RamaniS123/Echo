@@ -46,12 +46,18 @@ const CATEGORY_COLOUR = {
   hand:   styles.tagHand,
 };
 
-/** Smile is held at or above this strength (0–100) to count as "smiling". */
-const SMILE_STRENGTH_THRESHOLD = 60;
-/** How long (ms) the smile must be held before the step is complete. */
-const SMILE_HOLD_MS = 3000;
-/** Pause (ms) showing "Step complete!" before auto-advancing. */
-const TRANSITION_DELAY_MS = 1500;
+// ─── Mini-goal constants (tune these for demo) ────────────────────────────
+
+/** Minimum smile strength (0–100) to count as smiling. Observable max is ~35–40. */
+const SMILE_STRENGTH_THRESHOLD  = 25;
+/** How long the smile must be held above threshold before the step completes. */
+const SMILE_HOLD_DURATION_MS    = 4000;
+/** Arm hold is enforced inside useRaiseRightArmMetrics — 3000 ms. */
+const ARM_HOLD_DURATION_MS      = 4000; // eslint-disable-line no-unused-vars
+/** Hand hold is enforced inside useOpenHandMetrics — 2000 ms. */
+const HAND_HOLD_DURATION_MS     = 4000; // eslint-disable-line no-unused-vars
+/** Pause showing "Step complete" before auto-advancing. */
+const TRANSITION_DELAY_MS       = 1500;
 
 // ─── Component ────────────────────────────────────────────────────────────
 
@@ -154,7 +160,7 @@ export default function FullSession() {
       const isSmiling = smileMetrics.strength >= SMILE_STRENGTH_THRESHOLD;
       if (isSmiling) {
         if (smileHoldStartRef.current === null) smileHoldStartRef.current = Date.now();
-        isComplete = (Date.now() - smileHoldStartRef.current) >= SMILE_HOLD_MS;
+        isComplete = (Date.now() - smileHoldStartRef.current) >= SMILE_HOLD_DURATION_MS;
       } else {
         smileHoldStartRef.current = null;
       }
@@ -194,16 +200,38 @@ export default function FullSession() {
 
   // ── Derived display values ────────────────────────────────────────────────
   const activeLoading  = isSmileStep ? faceLoading : isArmStep ? poseLoading : handLoading;
-  const activeStatus   = isSmileStep ? smileStatus : isArmStep ? armStatus   : openHandStatus;
-  const isHandOpen     = isHandStep && openHandMetrics.openClose >= 55;
+  const isHandOpen     = isHandStep && openHandMetrics.openClose >= 22;
   const showSmileMetrics = sessionStarted && isSmileStep && !smileCalibrating && !faceLoading;
   const showArmMetrics   = sessionStarted && isArmStep  && !armCalibrating   && !poseLoading;
   const showHandMetrics  = sessionStarted && isHandStep && !openHandCalibrating && !handLoading;
-  function statusCardValue() {
-    if (!sessionStarted)  return 'Press Start Session to begin';
-    if (activeLoading)    return 'Loading tracker\u2026';
-    if (transitioning)    return 'Step complete \u2014 moving on\u2026';
-    return activeStatus;
+
+  /** Returns a meaningful, step-specific status string for the Status card. */
+  function getStepStatus() {
+    if (!sessionStarted) return 'Press Start Session to begin';
+    if (activeLoading)   return 'Loading tracker…';
+    if (transitioning)   return 'Step complete — moving on…';
+
+    if (isSmileStep) {
+      if (smileCalibrating) return smileStatus;
+      if (smileMetrics.strength >= SMILE_STRENGTH_THRESHOLD) return 'Good — hold your smile…';
+      return 'Smile as evenly as you can';
+    }
+
+    if (isArmStep) {
+      if (armCalibrating) return armStatus;
+      if (armStatus.includes('No body') || armStatus.includes('Raise')) return 'Raise your right arm';
+      if (armStatus.includes('Great job')) return 'Great job!';
+      return 'Good height — hold your arm steady';
+    }
+
+    if (isHandStep) {
+      if (openHandCalibrating) return openHandStatus;
+      if (openHandStatus.includes('No hand') || openHandStatus.includes('Open') || openHandStatus.includes('calibrate')) return 'Open your hand';
+      if (openHandStatus.includes('Great job')) return 'Great job!';
+      return 'Good — hold your hand open';
+    }
+
+    return '';
   }
 
   function handleStart()   { setSessionStarted(true); }
@@ -347,7 +375,7 @@ export default function FullSession() {
             {/* Status — always shown */}
             <MetricCard
               label="Status"
-              value={statusCardValue()}
+              value={getStepStatus()}
               accent={sessionStarted && !activeLoading && !transitioning}
               wide
             />

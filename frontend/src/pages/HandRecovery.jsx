@@ -71,7 +71,7 @@ export default function HandRecovery() {
   const statusAccent    = isTracking && !handLoading && !handError && handDetected && !calibrating;
 
   // isOpen for overlay colour
-  const isOpen = showLiveMetrics && activeMetrics.openClose >= 60 && activeMetrics.fingerSpread >= 50;
+  const isOpen = showLiveMetrics && activeMetrics.openClose >= 22;
 
   function getStatusValue() {
     if (!isTracking) {

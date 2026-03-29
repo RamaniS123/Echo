@@ -144,7 +144,7 @@ export function useOpenHandMetrics(landmarksRef, isTracking, handDetected) {
       };
 
       // isOpen from smoothed openClose only — spread is display-only and must not gate hold time
-      const isOpen = next.openClose >= 55;
+      const isOpen = next.openClose >= 22;
 
       // ── Hold time ────────────────────────────────────────────────────────
       if (isOpen) {
