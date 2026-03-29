@@ -61,7 +61,7 @@ export const SPREAD_RANGE = 0.10;
 /**
  * How long (ms) the hand must stay open before Hold Time starts counting.
  */
-export const HOLD_DURATION_MS = 2000;
+export const HOLD_DURATION_MS = 5000;
 
 /**
  * EMA smoothing factor for displayed metrics.

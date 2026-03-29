@@ -47,7 +47,7 @@ export const TARGET_RAISE_THRESHOLD = 0.08;
  * the hold counter starts contributing to the Hold Time display.
  * Matches the "hold for 3 seconds" instruction.
  */
-export const HOLD_DURATION_MS = 3000;
+export const HOLD_DURATION_MS = 5000;
 
 /**
  * EMA smoothing factor for displayed metrics.
