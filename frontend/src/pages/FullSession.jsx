@@ -115,40 +115,74 @@ export default function FullSession() {
 
   // ── TTS spoken-once flags (reset on restart) ─────────────────────────────
   const spokenRef = useRef({
-    welcome:   false,
-    smile:     false,
-    arm:       false,
-    hand:      false,
-    complete:  false,
+    welcome:        false, // intro message on Start
+    smileIntro:     false, // exercise instruction
+    smileHold:      false, // fired once when smile target is first reached
+    armIntro:       false,
+    armHold:        false,
+    handIntro:      false,
+    handHold:       false,
+    complete:       false,
   });
 
-  // Cleanup the advance timer on unmount only
+  // Cleanup transition timer on unmount only
   useEffect(() => () => clearTimeout(transitionTimerRef.current), []);
 
-  // ── TTS: welcome + per-step intro ─────────────────────────────────────────
-  // Welcome fires on start and includes the first exercise instruction so
-  // there is only ever one clip playing at session launch.
+  // ── TTS: welcome plays on page load, before Start is pressed ─────────────────
+  // Module-level flag prevents StrictMode double-invocation from playing twice.
   useEffect(() => {
-    if (!sessionStarted) return;
-    if (!spokenRef.current.welcome) {
-      spokenRef.current.welcome = true;
-      spokenRef.current.smile   = true; // already covered by the welcome message
-      speak("Welcome to Echo. Let's begin your recovery session. First, smile as evenly as you can.");
-    }
+    if (spokenRef.current.welcome) return;
+    spokenRef.current.welcome = true;
+    speak("Welcome to Echo. Please press Start when you're ready to begin your session.");
+  }, []); // runs once on mount
+
+  // ── TTS: first exercise instruction fires when Start is pressed ─────────────
+  useEffect(() => {
+    if (!sessionStarted || spokenRef.current.smileIntro) return;
+    spokenRef.current.smileIntro = true;
+    speak('Let\'s begin. Smile as evenly as you can and hold it for four seconds.');
   }, [sessionStarted]);
 
-  // Subsequent step intros fire when the step index advances (never on step 0).
+  // ── TTS: exercise intros (steps 2 and 3) ───────────────────────────────
   useEffect(() => {
     if (!sessionStarted) return;
-    if (isArmStep && !spokenRef.current.arm) {
-      spokenRef.current.arm = true;
-      speak('Great job. Stand with your arms relaxed at your sides while the app calibrates, then raise your right arm.');
+    if (isArmStep && !spokenRef.current.armIntro) {
+      spokenRef.current.armIntro = true;
+      speak('Now, stand with your arms relaxed at your sides while the app calibrates. Then raise your right arm and hold it steady for three seconds.');
     }
-    if (isHandStep && !spokenRef.current.hand) {
-      spokenRef.current.hand = true;
-      speak('Nice work. Make a relaxed fist while the app calibrates, then open your hand.');
+    if (isHandStep && !spokenRef.current.handIntro) {
+      spokenRef.current.handIntro = true;
+      speak('Almost done. Make a relaxed fist while the app calibrates. Then open your hand and hold it open for three seconds.');
     }
   }, [sessionStarted, isArmStep, isHandStep]);
+
+  // ── TTS: hold-phase cues (once per exercise when target first reached) ──────
+  useEffect(() => {
+    if (!sessionStarted || smileCalibrating) return;
+    const smiling = smileMetrics.strength >= SMILE_STRENGTH_THRESHOLD;
+    if (isSmileStep && smiling && !spokenRef.current.smileHold) {
+      spokenRef.current.smileHold = true;
+      speak('Good. Hold that smile.');
+    }
+  }, [sessionStarted, isSmileStep, smileCalibrating, smileMetrics.strength]);
+
+  useEffect(() => {
+    if (!sessionStarted || armCalibrating) return;
+    const armAtHeight = armStatus.includes('Hold') || armStatus.includes('Great job');
+    if (isArmStep && armAtHeight && !spokenRef.current.armHold) {
+      spokenRef.current.armHold = true;
+      speak('Good height. Keep your arm steady.');
+    }
+  }, [sessionStarted, isArmStep, armCalibrating, armStatus]);
+
+  useEffect(() => {
+    if (!sessionStarted || openHandCalibrating) return;
+    const handOpen = openHandStatus.includes('Hold') || openHandStatus.includes('Great job');
+    if (isHandStep && handOpen && !spokenRef.current.handHold) {
+      spokenRef.current.handHold = true;
+      speak('Good. Hold your hand open.');
+    }
+  }, [sessionStarted, isHandStep, openHandCalibrating, openHandStatus]);
 
   // ── Auto-transition: watch completion signals and advance automatically ───
   useEffect(() => {
@@ -243,7 +277,13 @@ export default function FullSession() {
     setSessionDone(false);
     smileHoldStartRef.current  = null;
     transitionFiredRef.current = false;
-    spokenRef.current = { welcome: false, smile: false, arm: false, hand: false, complete: false };
+    clearTimeout(transitionTimerRef.current);
+    spokenRef.current = {
+      welcome: false, smileIntro: false, smileHold: false,
+      armIntro: false, armHold: false,
+      handIntro: false, handHold: false,
+      complete: false,
+    };
   }
 
   // ── Session complete screen ───────────────────────────────────────────────
