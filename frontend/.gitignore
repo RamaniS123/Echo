@@ -15,6 +15,7 @@ dist
 dist-ssr
 
 # Environment variables
+backend/.env
 .env
 .env.*
 
