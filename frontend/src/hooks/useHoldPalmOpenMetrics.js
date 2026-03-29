@@ -4,45 +4,54 @@ import {
   averageHandBaseline,
   computeOpenHandMetrics,
   isHandLandmarksValid,
-  getOpenHandStatusText,
+  getHoldPalmOpenStatusText,
   SMOOTH,
-  HOLD_DURATION_MS,
+  HOLD_PALM_DURATION_MS,
+  HOLD_PALM_STABILITY_THRESHOLD,
   MOVEMENT_STABILITY_THRESHOLD,
 } from '../utils/handRecoveryMetrics';
 
-/** Number of valid frames to collect for the resting baseline (~1 s at 30 fps). */
+/** Frames needed for resting baseline calibration (~1 s at 30 fps). */
 const CALIBRATION_FRAMES = 30;
 
-/**
- * Rolling window size for movement quality — number of per-frame tip deltas.
- * Tracks ALL 5 fingertips simultaneously.
- */
+/** Rolling window for per-frame fingertip displacement. */
 const STABILITY_WINDOW = 20;
 
 /** Cap React state updates to ~25 fps. */
 const DISPLAY_INTERVAL = 1000 / 25;
 
+/**
+ * Smoothed openClose must be at or above this value for the hand to count as
+ * "open enough" for the hold-palm exercise.
+ */
+const OPEN_THRESHOLD = 60;
+
+/**
+ * Smoothed fingerSpread must be at or above this value for the hand to count
+ * as "spread enough".
+ */
+const SPREAD_THRESHOLD = 40;
+
 const ZERO_METRICS = { openClose: 0, fingerSpread: 0, holdTime: 0, movementQuality: 100 };
 
 /**
- * useOpenHandMetrics
+ * useHoldPalmOpenMetrics
  *
- * Drives the calibration phase and real-time metric computation for the
- * "Open Hand" exercise.
+ * Drives calibration and real-time metric computation for the
+ * "Hold Palm Open" exercise.
  *
- * Lifecycle:
- *   isTracking=false  → idle, all state reset
- *   isTracking=true   → wait for valid hand landmarks
- *                     → collect CALIBRATION_FRAMES baseline samples
- *                     → compute metrics each frame, throttle setState ~25 fps
+ * Differences from useOpenHandMetrics:
+ *   - isHolding requires openClose AND fingerSpread AND steadiness all met
+ *   - Hold duration target is HOLD_PALM_DURATION_MS (8 s)
+ *   - Status text uses getHoldPalmOpenStatusText
  *
- * @param {React.RefObject} landmarksRef   — from useHandTracking (.current = 21-pt array | null)
+ * @param {React.RefObject} landmarksRef  — from useHandTracking
  * @param {boolean}         isTracking
  * @param {boolean}         handDetected
  *
  * @returns {{ metrics, calibrating, statusText }}
  */
-export function useOpenHandMetrics(landmarksRef, isTracking, handDetected) {
+export function useHoldPalmOpenMetrics(landmarksRef, isTracking, handDetected) {
   const [calibrating, setCalibrating] = useState(false);
   const [metrics,     setMetrics]     = useState(ZERO_METRICS);
   const [statusText,  setStatusText]  = useState('Press start to begin');
@@ -57,9 +66,9 @@ export function useOpenHandMetrics(landmarksRef, isTracking, handDetected) {
   const holdStartRef = useRef(null);
   const holdMsRef    = useRef(0);
 
-  // Movement quality: ring buffer of avg per-frame fingertip distances
-  const prevTipsRef        = useRef(null);   // previous [x,y] for each of 5 tips
-  const frameDistancesRef  = useRef([]);     // rolling window of avg displacement per frame
+  // Steadiness: rolling ring buffer of avg per-frame fingertip displacements
+  const prevTipsRef       = useRef(null);
+  const frameDistancesRef = useRef([]);
 
   useEffect(() => {
     if (!isTracking) {
@@ -81,7 +90,7 @@ export function useOpenHandMetrics(landmarksRef, isTracking, handDetected) {
       return;
     }
 
-    // Start calibration
+    // Reset for fresh session
     baselineRef.current        = null;
     baselineSamplesRef.current = [];
     smoothedRef.current        = { ...ZERO_METRICS };
@@ -90,7 +99,7 @@ export function useOpenHandMetrics(landmarksRef, isTracking, handDetected) {
     prevTipsRef.current        = null;
     frameDistancesRef.current  = [];
     setCalibrating(true);
-    setStatusText('Make a relaxed fist to calibrate\u2026');
+    setStatusText('Hold still to calibrate\u2026');
 
     function tick(timestamp) {
       const landmarks = landmarksRef.current;
@@ -105,7 +114,7 @@ export function useOpenHandMetrics(landmarksRef, isTracking, handDetected) {
         return;
       }
 
-      // ── Landmarks invalid (shouldn't happen with MediaPipe Hands, but guard) ──
+      // ── Landmarks invalid ────────────────────────────────────────────────
       if (!isHandLandmarksValid(landmarks)) {
         if (timestamp - lastDisplayRef.current >= DISPLAY_INTERVAL) {
           lastDisplayRef.current = timestamp;
@@ -122,7 +131,7 @@ export function useOpenHandMetrics(landmarksRef, isTracking, handDetected) {
         if (baselineSamplesRef.current.length >= CALIBRATION_FRAMES) {
           baselineRef.current = averageHandBaseline(baselineSamplesRef.current);
           setCalibrating(false);
-          setStatusText('Open your hand wider');
+          setStatusText('Open your hand fully');
         }
 
         rafRef.current = requestAnimationFrame(tick);
@@ -132,31 +141,18 @@ export function useOpenHandMetrics(landmarksRef, isTracking, handDetected) {
       // ── Tracking ─────────────────────────────────────────────────────────
       const raw = computeOpenHandMetrics(landmarks, baselineRef.current);
 
-      // ── EMA smoothing (done BEFORE hold timer so isOpen uses stable values) ──
+      // ── EMA smoothing first — hold and status use stable values ──────────
       const s      = smoothedRef.current;
       const smooth = (a, b) => SMOOTH * a + (1 - SMOOTH) * b;
 
       const next = {
         openClose:       Math.round(smooth(raw.openClose,    s.openClose)),
         fingerSpread:    Math.round(smooth(raw.fingerSpread, s.fingerSpread)),
-        holdTime:        0, // filled in below
-        movementQuality: 0, // filled in below
+        holdTime:        0,   // filled below
+        movementQuality: 0,   // filled below
       };
 
-      // isOpen from smoothed openClose only — spread is display-only and must not gate hold time
-      const isOpen = next.openClose >= 55;
-
-      // ── Hold time ────────────────────────────────────────────────────────
-      if (isOpen) {
-        if (holdStartRef.current === null) holdStartRef.current = timestamp;
-        holdMsRef.current = timestamp - holdStartRef.current;
-      } else {
-        holdStartRef.current = null;
-        holdMsRef.current    = 0;
-      }
-      const holdMs = holdMsRef.current;
-
-      // ── Movement quality: avg per-frame 2D displacement of all 5 tips ────
+      // ── Steadiness: avg per-frame displacement of all 5 fingertips ───────
       const curTipPositions = raw.rawTips.map((lm) => [lm.x, lm.y]);
       let frameAvgDist = 0;
       if (prevTipsRef.current) {
@@ -182,18 +178,36 @@ export function useOpenHandMetrics(landmarksRef, isTracking, handDetected) {
         )));
       }
 
-      // ── Finalise smoothed metrics ─────────────────────────────────────────
-      next.holdTime        = Math.round(holdMs / 1000 * 10) / 10;
       next.movementQuality = Math.round(smooth(movementQuality, s.movementQuality));
-      smoothedRef.current  = next;
+
+      // ── Holding conditions: open + spread must be met; steadiness is display-only ──
+      const isOpenEnough   = next.openClose    >= OPEN_THRESHOLD;
+      const isSpreadEnough = next.fingerSpread >= SPREAD_THRESHOLD;
+      const isStableEnough = next.movementQuality >= HOLD_PALM_STABILITY_THRESHOLD;
+      const isHolding      = isOpenEnough && isSpreadEnough;
+
+      // ── Hold time ─────────────────────────────────────────────────────────
+      if (isHolding) {
+        if (holdStartRef.current === null) holdStartRef.current = timestamp;
+        holdMsRef.current = timestamp - holdStartRef.current;
+      } else {
+        holdStartRef.current = null;
+        holdMsRef.current    = 0;
+      }
+      const holdMs = holdMsRef.current;
+
+      next.holdTime       = Math.round(holdMs / 1000 * 10) / 10;
+      smoothedRef.current = next;
 
       // ── Throttle React state updates ──────────────────────────────────────
       if (timestamp - lastDisplayRef.current >= DISPLAY_INTERVAL) {
         lastDisplayRef.current = timestamp;
-        const text = getOpenHandStatusText({
-          noHand:      false,
-          calibrating: false,
-          isOpen,
+        const text = getHoldPalmOpenStatusText({
+          noHand:        false,
+          calibrating:   false,
+          isOpenEnough,
+          isSpreadEnough,
+          isHolding,
           holdMs,
         });
         setMetrics({ ...next });
@@ -212,12 +226,6 @@ export function useOpenHandMetrics(landmarksRef, isTracking, handDetected) {
       }
     };
   }, [isTracking, landmarksRef]);
-
-  // When hand detection flips to false mid-session, show clear message
-  useEffect(() => {
-    if (!isTracking || !baselineRef.current) return;
-    if (!handDetected) setStatusText('No hand detected');
-  }, [handDetected, isTracking]);
 
   return { metrics, calibrating, statusText };
 }

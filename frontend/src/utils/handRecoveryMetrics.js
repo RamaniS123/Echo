@@ -56,7 +56,7 @@ export const EXTENSION_RANGE = 0.6;
  * above the calibrated baseline for the metric to read 100%.
  * A real wide-open hand typically spreads ~0.10–0.20 above rest.
  */
-export const SPREAD_RANGE = 0.15;
+export const SPREAD_RANGE = 0.10;
 
 /**
  * How long (ms) the hand must stay open before Hold Time starts counting.
@@ -216,6 +216,39 @@ export function getOpenHandStatusText({ noHand, calibrating, isOpen, holdMs }) {
   if (holdMs >= HOLD_DURATION_MS)   return 'Great job \u2014 well done!';
   if (holdMs >= 1000)               return 'Hold that position';
   return 'Good opening \u2014 keep going';
+}
+
+/**
+ * Hold duration (ms) required for "Hold Palm Open" to count as complete.
+ * Longer than Open Hand because this exercise is about sustained hold.
+ */
+export const HOLD_PALM_DURATION_MS = 8000;
+
+/**
+ * Steadiness threshold: movementQuality must be at or above this value
+ * for the "Hold Palm Open" hold to be considered stable enough to count.
+ */
+export const HOLD_PALM_STABILITY_THRESHOLD = 35;
+
+/**
+ * @param {{
+ *   noHand: boolean,
+ *   calibrating: boolean,
+ *   isOpenEnough: boolean,
+ *   isSpreadEnough: boolean,
+ *   isHolding: boolean,
+ *   holdMs: number,
+ * }} state
+ * @returns {string}
+ */
+export function getHoldPalmOpenStatusText({ noHand, calibrating, isOpenEnough, isSpreadEnough, isHolding, holdMs }) {
+  if (noHand)                             return 'No hand detected';
+  if (calibrating)                        return 'Hold still to calibrate\u2026';
+  if (!isOpenEnough)                      return 'Open your hand fully';
+  if (!isSpreadEnough)                    return 'Spread your fingers';
+  if (holdMs >= HOLD_PALM_DURATION_MS)    return 'Great job \u2014 well done!';
+  if (isHolding)                          return 'Hold that position';
+  return 'Open your hand fully';
 }
 
 // ─── Canvas overlay ────────────────────────────────────────────────────────

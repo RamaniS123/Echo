@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ROUTES } from '../config/appConfig';
 import { useHandTracking } from '../hooks/useHandTracking';
 import { useOpenHandMetrics } from '../hooks/useOpenHandMetrics';
+import { useHoldPalmOpenMetrics } from '../hooks/useHoldPalmOpenMetrics';
 import WebcamPanel from '../components/WebcamPanel';
 import MetricCard from '../components/MetricCard';
 import HandOverlay from '../components/HandOverlay';
@@ -15,14 +16,9 @@ const EXERCISES = [
     instructionText: 'Starting with a relaxed fist, slowly spread all your fingers as wide as you can. Hold for 2 seconds, then gently close your hand. Repeat 8 times.',
   },
   {
-    id:              'closeHand',
-    label:           'Close Hand',
-    instructionText: 'Start with your hand open and fingers spread wide. Slowly curl your fingers inward to form a gentle fist. Hold for 2 seconds, then open again. Repeat 8 times.',
-  },
-  {
     id:              'holdPalmOpen',
     label:           'Hold Palm Open',
-    instructionText: 'Extend your arm and open your hand fully with your palm facing forward. Hold this position for 10 seconds, keeping your fingers as straight and spread as comfortable.',
+    instructionText: 'First make a relaxed fist so the app can calibrate. Then extend your arm, open your hand fully with your palm facing forward, and hold for 8 seconds.',
   },
 ];
 
@@ -35,9 +31,10 @@ export default function HandRecovery() {
   const webcamRef  = useRef(null);
   const overlayRef = useRef(null);
 
-  const exercise   = EXERCISES[exerciseIndex];
-  const isTracking = sessionStatus === STATUS.TRACKING;
-  const isOpenHand = exercise.id === 'openHand';
+  const exercise      = EXERCISES[exerciseIndex];
+  const isTracking     = sessionStatus === STATUS.TRACKING;
+  const isOpenHand     = exercise.id === 'openHand';
+  const isHoldPalmOpen = exercise.id === 'holdPalmOpen';
 
   // ── Hand detection (MediaPipe Hands) ─────────────────────────────────────
   const {
@@ -57,22 +54,33 @@ export default function HandRecovery() {
     isTracking && isOpenHand,
     handDetected,
   );
-
+  // ── Hold Palm Open metrics (active only for the holdPalmOpen exercise) ──
+  const {
+    metrics:    holdPalmMetrics,
+    calibrating: holdPalmCalibrating,
+    statusText:  holdPalmStatusText,
+  } = useHoldPalmOpenMetrics(
+    landmarksRef,
+    isTracking && isHoldPalmOpen,
+    handDetected,
+  );
   // ── Derived display values ────────────────────────────────────────────────
-  const calibrating     = isOpenHand ? openHandCalibrating : false;
-  const showLiveMetrics = isTracking && isOpenHand && !calibrating && !handLoading && !handError;
+  const calibrating     = isOpenHand ? openHandCalibrating : isHoldPalmOpen ? holdPalmCalibrating : false;
+  const activeMetrics   = isOpenHand ? openHandMetrics : holdPalmMetrics;
+  const showLiveMetrics = isTracking && (isOpenHand || isHoldPalmOpen) && !calibrating && !handLoading && !handError;
   const statusAccent    = isTracking && !handLoading && !handError && handDetected && !calibrating;
 
-  // isOpen for overlay colour — read directly from latest metrics when available
-  const isOpen = showLiveMetrics && openHandMetrics.openClose >= 80 && openHandMetrics.fingerSpread >= 80;
+  // isOpen for overlay colour
+  const isOpen = showLiveMetrics && activeMetrics.openClose >= 60 && activeMetrics.fingerSpread >= 50;
 
   function getStatusValue() {
     if (!isTracking) {
       return sessionStatus === STATUS.STOPPED ? 'Session stopped' : 'Press start to begin';
     }
-    if (handLoading)  return 'Loading hand tracker\u2026';
-    if (handError)    return 'Hand tracker unavailable';
-    if (isOpenHand)   return openHandStatusText;
+    if (handLoading)      return 'Loading hand tracker…';
+    if (handError)        return 'Hand tracker unavailable';
+    if (isOpenHand)       return openHandStatusText;
+    if (isHoldPalmOpen)   return holdPalmStatusText;
     return 'Hand detection coming soon for this exercise';
   }
 
@@ -98,7 +106,7 @@ export default function HandRecovery() {
           <HandOverlay
             overlayRef={overlayRef}
             landmarksRef={landmarksRef}
-            isTracking={isTracking && isOpenHand}
+            isTracking={isTracking && (isOpenHand || isHoldPalmOpen)}
             isOpen={isOpen}
           />
           <p className={styles.cameraNote}>
@@ -118,19 +126,19 @@ export default function HandRecovery() {
           <div className={styles.metricsGrid} aria-label="Exercise metrics">
             <MetricCard
               label="Open / Close"
-              value={showLiveMetrics ? String(openHandMetrics.openClose) : '--'}
+              value={showLiveMetrics ? String(activeMetrics.openClose) : '--'}
             />
             <MetricCard
               label="Finger Spread"
-              value={showLiveMetrics ? String(openHandMetrics.fingerSpread) : '--'}
+              value={showLiveMetrics ? String(activeMetrics.fingerSpread) : '--'}
             />
             <MetricCard
               label="Hold Time"
-              value={showLiveMetrics ? `${openHandMetrics.holdTime}s` : '--'}
+              value={showLiveMetrics ? `${activeMetrics.holdTime}s` : '--'}
             />
             <MetricCard
               label="Steadiness"
-              value={showLiveMetrics ? String(openHandMetrics.movementQuality) : '--'}
+              value={showLiveMetrics ? String(activeMetrics.movementQuality) : '--'}
             />
             <MetricCard
               label="Status"
