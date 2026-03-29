@@ -1,634 +1,475 @@
-# Echo — Copilot Project Context
+/\*
+PROJECT: Echo
+TAGLINE: Voice-First Stroke Recovery Coach
+HACKATHON: Hack Indy 2026 (36-hour build)
 
-## Project Summary
+OVERVIEW:
+Echo is a web application that helps stroke recovery patients practice guided
+movement exercises at home. It uses real-time computer vision to measure
+movement and symmetry, and voice-first coaching to guide users through exercises
+in an accessible way.
 
-Echo is a web application for guided at-home stroke recovery practice.
+The app is designed for patients recovering from stroke, especially those with
+limited access to regular therapy. It focuses on guided practice, visible
+feedback, and a calm, accessible user experience.
 
-It provides a voice-first, highly accessible rehab experience focused on:
+IMPORTANT PRODUCT BOUNDARIES:
 
-- facial symmetry practice
-- facial muscle activation practice
-- short speech / articulation practice
+- NOT a medical diagnostic tool
+- NOT a replacement for licensed therapy
+- NOT intended to clinically evaluate stroke severity
+- Intended only as a guided home-practice and feedback tool
 
-Echo is designed for users recovering from stroke, including elderly users and users with limited access to frequent therapy sessions.
+TARGET USERS:
 
-## Product Boundaries
+- Stroke recovery patients with facial asymmetry
+- Patients practicing upper-body or hand recovery movements
+- Users with limited access to therapy
+- Elderly users who benefit from voice-first guidance and simple UI
 
-Echo is:
+PRIMARY PRODUCT DIRECTION:
+Echo is no longer focused on speech therapy.
+Instead, Echo focuses on guided recovery exercises in three categories:
 
-- a guided practice tool
-- a lightweight coaching experience
-- an accessibility-focused rehab companion
+1. Facial Recovery
+2. Arm Movement
+3. Hand Recovery
 
-Echo is NOT:
+It also includes: 4. Full Session Mode
 
-- a medical diagnostic tool
-- a replacement for licensed therapy
-- a clinical speech assessment system
-- a system that detects stroke severity, dysarthria, or aphasia
+==================================================
+CORE MODES
+==================================================
 
-All code, copy, and UI should avoid medical claims or diagnostic language.
+1. FACIAL RECOVERY
+   Purpose:
 
----
+- Practice simple facial recovery exercises
+- Track movement and symmetry in real time
 
-## Core Product Modes
+MVP exercises:
 
-1. Facial Exercise Mode
-2. Speech Practice Mode
-3. Session Summary Mode
+- Smile
+- Eyebrow Raise
+- Eye Closure (UI only or later if time)
 
-The app should be structured so additional exercises and phrase categories can be added later without rewriting core logic.
+Implementation status:
 
----
+- Smile should be functional
+- Eyebrow Raise should be functional
+- Third facial exercise can exist in UI as placeholder if needed
 
-## Architecture
+2. ARM MOVEMENT
+   Purpose:
 
-### Frontend
+- Practice guided upper-limb movement exercises
+
+Planned exercises:
+
+- Raise Right Arm
+- Raise Left Arm
+- Hold Arm at Shoulder Height
+
+Implementation status:
+
+- UI should include all 3 exercises
+- Only one arm exercise needs to be functional for MVP
+- Best first implemented arm exercise:
+  - Raise Right Arm
+
+Future tracking likely uses:
+
+- MediaPipe Pose
+
+3. HAND RECOVERY
+   Purpose:
+
+- Practice guided hand recovery / mobility exercises
+
+Planned exercises:
+
+- Open Hand
+- Close Hand
+- Hold Palm Open
+
+Implementation status:
+
+- UI should include all 3 exercises
+- Only one hand exercise needs to be functional for MVP
+- Best first implemented hand exercise:
+  - Open Hand
+
+Future tracking likely uses:
+
+- MediaPipe Hands
+
+4. FULL SESSION
+   Purpose:
+
+- Provide a guided sequence of exercises across categories
+- Make the app feel like a real rehab routine, not isolated demos
+
+MVP full session flow:
+
+- One facial exercise
+- One arm movement exercise
+- One hand recovery exercise
+
+Implementation status:
+
+- Build the UI and session flow first
+- It can initially walk through the sequence as a guided interface
+- It does not need full tracking for every exercise immediately
+
+==================================================
+ARCHITECTURE
+==================================================
+
+FRONTEND:
 
 - React + Vite
-- owns all real-time webcam and microphone processing
-- runs MediaPipe face tracking in the browser
-- computes deterministic movement and symmetry metrics locally
-- renders live feedback UI
-- sends only structured metrics to backend APIs
+- Handles:
+  - webcam access
+  - MediaPipe integration
+  - deterministic scoring logic
+  - UI state
+  - session flow
+- Frontend owns all real-time movement calculations
 
-### Backend
+BACKEND:
 
 - FastAPI + Uvicorn
-- thin orchestration layer only
-- stores API keys in environment variables
-- calls ElevenLabs for text-to-speech
-- calls Gemini for natural-language coaching and summaries
-- does not perform real-time scoring
-- does not contain frontend-specific business logic
-- no auth required for MVP
-- no database required for MVP
+- Lightweight proxy layer only
+- Keeps external API keys secure
+- Handles:
+  - ElevenLabs requests
+  - Gemini requests
 
-### Important Architecture Rule
+IMPORTANT:
 
-Frontend owns:
+- No heavy backend logic
+- No authentication for MVP
+- No database required for MVP
+- MongoDB Atlas optional only as stretch goal
 
-- live tracking
-- live scoring
-- exercise state
-- speech attempt metrics
-- fallback logic for unsupported browser features
+==================================================
+ELEVENLABS USAGE
+==================================================
 
-Backend owns:
+ElevenLabs is a core feature.
+It should act as the voice coach for the entire experience.
 
-- converting structured metrics into short supportive coaching text
-- generating spoken prompts and spoken summaries
+Default voice:
 
-Do not move real-time scoring into the backend.
+- Rachel
+- Voice ID: EXAVITQu4vr4xnSDxMaL
 
----
+Default model:
 
-## Non-Hardcoding Rules
+- eleven_monolingual_v1
 
-Copilot should avoid hardcoding behavior unless it is clearly isolated in configuration.
+Suggested settings:
 
-### Do NOT hardcode:
+- stability: 0.5
+- similarity_boost: 0.75
 
-- target phrases directly inside components
-- exercise definitions directly inside JSX
-- landmark indices scattered across files
-- movement thresholds scattered across utilities
-- feedback strings embedded in scoring logic
-- API base URLs inline across the app
-- magic numbers for symmetry scoring
-- browser feature assumptions
-- hardcoded UI status colors in multiple places
-- hardcoded exercise progression logic
-- model-specific assumptions tightly coupled to business logic
+Use ElevenLabs for:
 
-### Prefer:
+- spoken greetings
+- spoken exercise prompts
+- spoken corrective feedback
+- spoken encouragement
+- spoken transitions between exercises
+- spoken end-of-session summary
 
-- central config objects
-- typed constants
-- reusable mappings
-- feature flags
-- helper functions
-- adapters around third-party APIs
-- deterministic utility functions with explicit inputs
-- parameterized thresholds
-- dependency injection where reasonable
-
----
-
-## Preferred Frontend Design
-
-The frontend should be modular and driven by data/config.
-
-### Use configuration-driven definitions for:
-
-- available exercise modes
-- facial exercises
-- speech categories
-- speech phrase lists
-- landmark groups and facial regions
-- score thresholds
-- feedback state labels
-- session summary labels
-- UI copy where possible
-
-### Example concept
-
-Instead of hardcoding:
-
-- "Smile"
-- "Raise Eyebrows"
-- "Hello"
-- threshold values
-- route labels
-
-prefer patterns like:
-
-- `FACIAL_EXERCISES`
-- `SPEECH_CATEGORIES`
-- `PHRASE_SETS`
-- `LANDMARK_GROUPS`
-- `THRESHOLD_CONFIG`
-- `FEEDBACK_RULES`
-
-These should live in dedicated config files.
-
----
-
-## Suggested Data Model Shape
-
-### Facial exercise definition
-
-Each facial exercise should be represented as structured data, not custom one-off UI logic.
-
-Suggested fields:
-
-- id
-- label
-- description
-- instructionText
-- region
-- requiredLandmarks
-- metricFunctionKey
-- thresholds
-- enabled
-
-### Speech category definition
-
-Each speech category should be represented as structured data.
-
-Suggested fields:
-
-- id
-- label
-- description
-- enabled
-- phrases
-
-### Phrase definition
-
-Each phrase should be represented as data.
-
-Suggested fields:
-
-- id
-- text
-- difficulty
-- enabled
-
-### Feedback state definition
-
-Feedback should be generated from structured state, not from nested inline conditionals spread throughout components.
-
-Suggested fields:
-
-- id
-- conditions
-- messageKey
-- severity
-- spokenVariantAllowed
-
----
-
-## Facial Exercise MVP
-
-MVP facial exercises:
-
-- smile
-- eyebrow raise
-- eye closure
-
-At minimum, the codebase must support:
-
-- smile
-- one additional facial exercise
-
-The architecture should allow more exercises later without new page-level logic.
-
-### Facial metrics should be:
-
-- deterministic
-- interpretable
-- based on landmark geometry
-- relative to baseline or stable reference points
-- smoothed to reduce jitter
-
-### Facial scoring should not:
-
-- claim clinical precision
-- imply diagnosis
-- assume fixed user anatomy
-- rely on single-frame measurements only
-
-### Landmark notes
-
-MediaPipe landmark IDs may change during implementation testing.
-Landmark references should be isolated in a single source of truth, such as:
-
-- `landmarks.ts`
-- `faceRegions.ts`
-- `facialConfig.ts`
-
-Do not scatter landmark IDs across components or utility files.
-
----
-
-## Speech Practice MVP
-
-Speech mode should support a category-based UI.
-
-The UI may show multiple categories, but MVP only needs one fully working category:
-
-- Common Phrases
-
-Example categories:
-
-- Common Phrases
-- Daily Conversation
-- Articulation Drills
-
-Only enabled categories should be selectable as active flows.
-
-### Common Phrases MVP
-
-Use a small configurable phrase list for MVP, such as:
-
-- Hello
-- Thank you
-- Good morning
-- I am okay
-- I need help
-- Water please
-
-These phrases must come from config, not from inline component arrays.
-
-### Speech attempt metrics
-
-Frontend may compute:
-
-- speech detected or not
-- duration
-- average volume / RMS
-- optional browser transcript
-- transcript similarity to target phrase
-- mouth opening / mouth movement while speaking
-
-Speech mode should combine:
-
-- audio attempt signals
-- visible mouth movement signals
-
-### Important speech rule
-
-Do not claim:
-
-- slur detection
-- clinical articulation scoring
-- diagnosis
-- phoneme correctness
-- medically authoritative speech evaluation
-
-Speech feedback should remain simple, supportive, and believable.
-
----
-
-## Speech Feedback Design
-
-Speech feedback should be based on structured metrics, not hardcoded per-phrase branches.
-
-Example metric inputs:
-
-- targetPhraseId
-- speechDetected
-- durationMs
-- averageVolume
-- transcript
-- transcriptSimilarity
-- mouthMovementScore
-- attemptCount
-
-Example feedback states:
-
-- no speech detected
-- too quiet
-- too short
-- weak phrase match
-- low mouth movement
-- good attempt
-- strong attempt
-
-Prefer a rule engine or mapping layer over deeply nested `if/else` chains in UI files.
-
----
-
-## Real-Time Visual Feedback
-
-### Facial Mode UI
-
-Should support:
-
-- webcam feed
-- optional landmark overlay
-- left movement bar
-- right movement bar
-- symmetry score
-- current instruction
-- current status
-
-### Speech Mode UI
-
-Should support:
-
-- target phrase
-- mic activity indicator
-- mouth movement indicator
-- optional transcript if supported
-- simple status text
-
-UI should be:
-
-- high contrast
-- large and readable
-- minimal in text density
-- calm and uncluttered
-- easy to understand quickly during a demo
-
-Do not bury important status state inside tiny labels.
-
----
-
-## Accessibility Requirements
-
-Prioritize:
-
-- large click targets
-- voice-first interaction
-- minimal reading requirement
-- keyboard friendliness where possible
-- clear camera/microphone fallback messaging
-- strong contrast
-- simple interaction flow
-
-Accessibility should not be an afterthought or layered in only through CSS overrides.
-
----
-
-## Performance Requirements
-
-The app should feel smooth and demo-ready.
-
-Prioritize:
-
-- stable webcam rendering
-- stable face tracking
-- reduced jitter through smoothing
-- throttled status updates
-- prevention of repeated spoken feedback spam
-- lightweight rerenders
-
-Do not write code that recomputes expensive measurements unnecessarily on every render.
-
-Prefer:
-
-- memoized calculations where appropriate
-- frame processing hooks
-- debounced or thresholded feedback emission
-- explicit state transitions
-
----
-
-## Error Handling
-
-The app must gracefully handle:
-
-- camera permission denied
-- microphone permission denied
-- face not detected
-- low lighting
-- speech recognition unavailable
-- backend request failure
-- ElevenLabs failure
-
-Fallback behavior:
-
-- if TTS fails, show text feedback
-- if browser speech recognition fails, continue with volume + duration + face movement only
-- if face tracking fails, show camera guidance and allow retry
-
-Do not assume all browser capabilities are present.
-
----
-
-## Backend API Design
-
-Backend should remain thin and predictable.
-
-### `POST /api/tts`
-
-Input:
-
-- text
-- type
-
-Returns:
-
-- audio response or streamable payload
-
-### `POST /api/feedback`
-
-Input:
-
-- mode
-- exercise
-- metrics
-- attemptCount
-
-Returns:
-
-- short supportive message
-
-### `POST /api/summary`
-
-Input:
-
-- completed exercise stats
-- best scores
-- speech attempt stats
-- trend notes
-
-Returns:
-
-- short supportive summary
-
-### Backend implementation rules
-
-- keep request/response schemas explicit
-- validate payloads with Pydantic
-- keep third-party provider code in service modules
-- keep prompt construction out of route handlers
-- do not embed large prompt strings directly in route functions
-- allow fallback non-LLM responses where useful
-
----
-
-## Prompting / AI Output Rules
-
-Gemini output should be:
-
-- short
-- supportive
-- clear
-- non-clinical
-- one or two sentences max
-
-ElevenLabs text should be:
+Voice style:
 
 - warm
 - calm
+- supportive
 - concise
-- easy to voice naturally
-- never alarmist
+- non-clinical
 
-Do not generate:
+Examples:
 
-- scary language
-- diagnostic statements
-- confidence claims about medical status
-- overly verbose coaching paragraphs during exercises
+- "Smile as evenly as you can."
+- "Raise your right arm slowly."
+- "Open your hand and hold it."
+- "Great effort. Let's move to the next exercise."
+- "Nice work today. You completed your full session."
 
----
+==================================================
+GEMINI USAGE
+==================================================
 
-## Code Organization Preferences
+Gemini should be used naturally, not forced.
 
-### Frontend
+Gemini IS used for:
 
-Prefer structure similar to:
+- turning deterministic metrics into natural-language feedback
+- generating session summaries
+- suggesting what exercise to do next
+- making spoken feedback sound supportive and human
 
-- `components/`
-- `hooks/`
-- `pages/`
-- `utils/`
-- `config/`
-- `types/`
-- `services/`
+Gemini is NOT used for:
 
-Suggested responsibilities:
+- real-time scoring
+- real-time pass/fail detection
+- clinical diagnosis
+- primary movement detection
 
-- `config/`: exercises, phrases, thresholds, landmarks, labels
-- `utils/`: pure measurement functions and scoring helpers
-- `hooks/`: camera, face tracking, microphone, speech attempt state
-- `services/`: API client wrappers
-- `components/`: reusable presentational UI
-- `pages/`: mode-level composition only
+Frontend calculates:
 
-### Backend
+- movement
+- symmetry
+- side differences
+- hold duration
+- tracking state
 
-Prefer structure similar to:
+Backend (Gemini) converts those metrics into:
 
-- `routes/`
-- `services/`
-- `models/`
-- `core/`
+- short coaching text
+- recap summaries
+- gentle next-step suggestions
 
-Suggested responsibilities:
+==================================================
+CURRENT MVP IMPLEMENTATION PRIORITY
+==================================================
 
-- `routes/`: request handling only
-- `services/`: ElevenLabs, Gemini, summary generation
-- `models/`: Pydantic schemas
-- `core/`: settings, environment loading, shared utilities
+1. Facial Recovery
 
----
+- Smile: functional
+- Eyebrow Raise: functional
+- Eye Closure: optional / placeholder
 
-## Coding Style
+2. Arm Movement
 
-- use functional React components only
-- use hooks, not classes
-- favor small pure functions
-- separate measurement logic from UI rendering
-- separate scoring logic from feedback text generation
-- keep components focused and composable
-- prefer explicit names over clever abstractions
-- comment assumptions around thresholds and landmarks
-- use constants/config instead of magic numbers
-- avoid tight coupling between pages and exercise internals
+- UI for 3 exercises
+- Only one needs to become functional in MVP
 
----
+3. Hand Recovery
 
-## Demo Priorities
+- UI for 3 exercises
+- Only one needs to become functional in MVP
 
-The demo should feel polished around one complete rehab loop.
+4. Full Session
 
-Strong demo moments:
+- UI and flow should exist
+- Can guide user through:
+  - one facial exercise
+  - one arm exercise
+  - one hand exercise
 
-- spoken greeting
-- live smile or eyebrow tracking
-- visible left/right movement bars
-- immediate supportive spoken feedback
-- speech mode with common phrase practice
-- summary screen with recap
+==================================================
+UI / UX REQUIREMENTS
+==================================================
 
-Code should prioritize reliability and clarity over unnecessary complexity.
+Global:
 
----
+- dark theme
+- high contrast
+- voice-first
+- large buttons
+- minimal text
+- accessible and calm interface
 
-## Implementation Guidance for Copilot
+Each exercise screen should include:
 
-When generating code for this project:
+- back button
+- page title
+- webcam panel / placeholder
+- exercise title
+- short instruction text
+- metrics cards
+- status card / feedback area
+- primary action button
+- next exercise button
 
-1. Prefer config-driven solutions over inline literals.
-2. Avoid magic numbers; place thresholds in named config.
-3. Keep third-party SDK usage behind wrappers or service helpers.
-4. Write pure utility functions for landmark calculations.
-5. Keep measurement, scoring, and messaging as separate layers.
-6. Assume future exercises and phrase categories will be added.
-7. Do not hardcode only-one-exercise assumptions into component structure.
-8. Do not hardcode only-one-category assumptions into speech mode.
-9. Make unsupported browser features degrade gracefully.
-10. Keep the backend thin and the frontend in control of live logic.
+Facial exercise metrics:
 
----
+- Left
+- Right
+- Symmetry Score
+- Movement Strength
+- Status
 
-## Anti-Patterns to Avoid
+Arm movement metrics (placeholder for now):
 
-- giant page components with embedded business logic
-- hardcoded phrase arrays inside render functions
-- hardcoded thresholds inside conditionals
-- repeated landmark indices across files
-- direct provider SDK calls from UI components
-- mixing score calculation and message wording in the same function
-- assuming transcript support always exists
-- assuming camera and microphone are always available
-- making medical-sounding claims in UI copy or generated text
+- Height
+- Stability
+- Hold Time
+- Range of Motion
+- Status
 
----
+Hand recovery metrics (placeholder for now):
 
-## Goal
+- Open/Close
+- Finger Spread
+- Hold Time
+- Movement Quality
+- Status
 
-Build a demo-quality, accessible, voice-first rehab app that feels real, helpful, and extensible.
+Full session UI should include:
 
-The codebase should be organized so that:
+- current exercise
+- current category
+- progress stepper or progress label
+- next step button
+- session status / spoken guidance area
 
-- one exercise can be implemented quickly
-- a second exercise can be added with minimal friction
-- one speech category can work now
-- more categories and phrases can be enabled later by configuration
-- feedback remains deterministic, modular, and safe
+==================================================
+REAL-TIME CV STACK
+==================================================
+
+Facial Recovery:
+
+- MediaPipe Face Landmarker / Face Mesh
+
+Arm Movement:
+
+- MediaPipe Pose (future functional implementation)
+
+Hand Recovery:
+
+- MediaPipe Hands (future functional implementation)
+
+MVP note:
+Only Facial Recovery must be fully implemented first.
+Arm and Hand can begin as complete UI flows.
+
+==================================================
+BUILD ORDER
+==================================================
+
+1. Finalize UI shell for all 4 modes:
+   - Facial Recovery
+   - Arm Movement
+   - Hand Recovery
+   - Full Session
+
+2. Keep Facial Recovery functional
+   - Smile
+   - Eyebrow Raise
+
+3. Add arm movement UI
+   - 3 exercise cards/screens
+   - one eventually becomes functional
+
+4. Add hand recovery UI
+   - 3 exercise cards/screens
+   - one eventually becomes functional
+
+5. Add Full Session UI flow
+   - sequence through one exercise from each category
+
+6. Integrate ElevenLabs prompts and transitions
+
+7. Add Gemini feedback + summaries
+
+8. If time:
+   - make one arm exercise functional
+   - make one hand exercise functional
+
+==================================================
+MVP DEFINITION
+==================================================
+
+MUST HAVE:
+
+- Home screen with all 4 modes
+- Facial Recovery page with Smile and Eyebrow Raise working
+- Arm Movement page with 3 exercise options in UI
+- Hand Recovery page with 3 exercise options in UI
+- Full Session page / flow in UI
+- Voice coaching infrastructure planned for all modes
+- Clean, consistent UI
+
+SHOULD HAVE:
+
+- one arm exercise functional
+- one hand exercise functional
+- ElevenLabs voice prompts and transitions
+
+NICE TO HAVE:
+
+- Gemini coaching text
+- Gemini session summary
+- third facial exercise
+- MongoDB session history
+
+==================================================
+FILE STRUCTURE
+==================================================
+
+frontend/src/
+components/
+WebcamPanel.jsx
+MetricCard.jsx
+SymmetryBars.jsx
+ExerciseCard.jsx
+SessionProgress.jsx
+hooks/
+useFaceTracking.js
+useSmileMetrics.js
+useEyebrowMetrics.js
+pages/
+Home.jsx
+FacialExercise.jsx
+ArmMovement.jsx
+HandRecovery.jsx
+FullSession.jsx
+utils/
+smileMetrics.js
+eyebrowMetrics.js
+apiClient.js
+App.jsx
+App.css
+index.css
+
+backend/app/
+main.py
+routes/
+tts.py
+feedback.py
+summary.py
+services/
+elevenlabs_service.py
+gemini_service.py
+models/
+schemas.py
+
+==================================================
+DEMO FLOW
+==================================================
+
+1. Open Echo
+2. Show home screen with all categories
+3. Enter Facial Recovery
+4. Demonstrate Smile and Eyebrow Raise
+5. Show Arm Movement UI
+6. Show Hand Recovery UI
+7. Enter Full Session
+8. Show how Echo guides the user through a sequence
+9. End with summary / recap
+
+==================================================
+JUDGING POSITIONING
+==================================================
+
+Innovation:
+
+- voice-first guided rehab using real-time movement tracking
+
+Technical:
+
+- facial tracking now, extensible to pose and hand tracking
+- frontend CV + lightweight backend AI/TTS integration
+
+Impact:
+
+- supports home recovery in low-access environments
+
+Presentation:
+
+- highly visual, guided, and easy to understand live
+  \*/

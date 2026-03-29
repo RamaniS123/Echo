@@ -143,7 +143,7 @@ export default function FullSession() {
     speak('Let\'s begin. Smile as evenly as you can and hold it for four seconds.');
   }, [sessionStarted]);
 
-  // ── TTS: exercise intros (steps 2 and 3) ───────────────────────────────
+  // ── TTS: exercise intros (steps 2 and 3) ──────────────────────────────
   useEffect(() => {
     if (!sessionStarted) return;
     if (isArmStep && !spokenRef.current.armIntro) {
