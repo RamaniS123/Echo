@@ -210,20 +210,23 @@ export default function FullSession() {
     setTransitioning(true);
 
     // Store timer in a ref — returning cleanup here would cancel it on every re-render
+    // Use a longer delay on steps where a hold cue may still be playing
+    const isFinalStep = stepIndex >= SESSION_STEPS.length - 1;
+    const delay = (isFinalStep || isArmStep) ? 4000 : TRANSITION_DELAY_MS;
     transitionTimerRef.current = setTimeout(() => {
-      if (stepIndex >= SESSION_STEPS.length - 1) {
-        setSessionDone(true);
+      if (isFinalStep) {
         if (!spokenRef.current.complete) {
           spokenRef.current.complete = true;
           speak('Session complete. Great job today.');
         }
+        setSessionDone(true);
       } else {
         setStepIndex((i) => i + 1);
         smileHoldStartRef.current = null;
       }
       setTransitioning(false);
       transitionFiredRef.current = false;
-    }, TRANSITION_DELAY_MS);
+    }, delay);
   }, [
     sessionStarted, transitioning, sessionDone,
     isSmileStep, smileCalibrating, smileMetrics.strength,
