@@ -102,15 +102,6 @@ The session advances automatically when each step’s completion condition is me
 
 ---
 
-## AI / Tool Usage Disclosure
-
-This project was developed with assistance from:
-
-- ChatGPT for ideation, debugging, and documentation  
-- GitHub Copilot for code scaffolding and development assistance  
-
----
-
 ## Key Takeaways
 
 - Translating computer vision data into meaningful feedback requires calibration and normalization  
